@@ -1,0 +1,34 @@
+encoders:
+  - name: weather_encoder
+    type: one-hot
+    columns:
+      - weather_category
+    drop_first: False
+    prefix: weather
+    prefix_separator: _
+    sparse: False
+
+features:
+  categorical:
+    - weather_category
+  numerical:
+    - max_temp
+    - min_temp
+    - avg
+    - rng
+    - cdd
+    - hdd
+    - dow_sin
+    - dow_cos
+    - mon_sin
+    - mon_cos
+  binary:
+    - hot
+    - cold
+    - weekend
+    - holiday
+
+model:
+  target: max_power
+  test_size: 0.2
+  random_state: 42
