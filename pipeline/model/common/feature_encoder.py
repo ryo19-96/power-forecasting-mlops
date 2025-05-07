@@ -41,7 +41,7 @@ class FeatureEncoder:
         Args:
             input_df (pd.DataFrame): エンコードするデータ
         """
-        self.encoder.fit(input_df[self.columns])
+        self.encoder.fit(input_df)
         self.fitted = True
     
     def transform(self, input_df: pd.DataFrame) -> pd.DataFrame:

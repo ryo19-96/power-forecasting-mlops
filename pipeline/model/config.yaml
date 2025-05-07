@@ -1,12 +1,7 @@
 encoders:
-  - name: weather_encoder
-    type: one-hot
+  - name: One-Hot
     columns:
       - weather_category
-    drop_first: False
-    prefix: weather
-    prefix_separator: _
-    sparse: False
 
 features:
   categorical:
