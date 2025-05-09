@@ -1,8 +1,6 @@
+import logging
 import os
 import zipfile
-from typing import Dict, List, Optional, Tuple, Union
-from pathlib import Path
-import logging
 
 import pandas as pd
 
@@ -14,7 +12,7 @@ logger.addHandler(logging.StreamHandler())
 class DataLoader:
     """データ読み込みを担当するクラス"""
 
-    def __init__(self, config: Dict = None) -> None:
+    def __init__(self, config: dict = None) -> None:
         """
         Args:
             config: 設定情報の辞書
@@ -27,7 +25,7 @@ class DataLoader:
         self.weather_file = self.config.get("weather_file", "weather_data.csv")
         self.power_usage_dir = self.config.get("power_usage_dir", "power_usage")
 
-    def load_weather_data(self, encoding: str = "shift-jis", skiprows: List[int] = [0, 1, 2, 4, 5]) -> pd.DataFrame:
+    def load_weather_data(self, encoding: str = "shift-jis", skiprows: list[int] = [0, 1, 2, 4, 5]) -> pd.DataFrame:
         """気象データファイルを読み込む
 
         Args:
@@ -50,7 +48,7 @@ class DataLoader:
                 "最高気温(℃)": "max_temp",
                 "最低気温(℃)": "min_temp",
                 "天気概況(昼：06時〜18時)": "weather",
-            }
+            },
         )
 
         # 日付をdatetime型に変換

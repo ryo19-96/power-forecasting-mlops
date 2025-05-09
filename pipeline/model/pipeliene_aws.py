@@ -1,13 +1,11 @@
-import os
 from pathlib import Path
-from typing import Optional
 
 import boto3
 import sagemaker
 import sagemaker.session
 from botocore.client import BaseClient
+from sagemaker import hyperparameters
 from sagemaker.estimator import Estimator
-from sagemaker.sklearn.estimator import SKLearn
 from sagemaker.inputs import TrainingInput
 from sagemaker.model_metrics import MetricsSource, ModelMetrics
 from sagemaker.processing import ProcessingInput, ProcessingOutput, ScriptProcessor
@@ -20,8 +18,6 @@ from sagemaker.workflow.pipeline import Pipeline
 from sagemaker.workflow.properties import PropertyFile
 from sagemaker.workflow.step_collections import RegisterModel
 from sagemaker.workflow.steps import ProcessingStep, TrainingStep
-from sagemaker import hyperparameters
-
 
 BASE_DIR = Path(__file__).parent
 

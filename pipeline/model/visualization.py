@@ -1,11 +1,9 @@
 import os
-from typing import Dict, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import japanize_matplotlib
 
 
 class Visualizer:
@@ -24,7 +22,7 @@ class Visualizer:
         feature_importance_df: pd.DataFrame,
         plot_features: int = 20,
         save_name: str = "feature_importance",
-        figsize: Tuple[int, int] = None,
+        figsize: tuple[int, int] = None,
     ) -> None:
         """特徴量重要度のプロットを行う
 
@@ -59,11 +57,11 @@ class Visualizer:
 
     def plot_prediction_vs_actual(
         self,
-        y_true: Union[pd.Series, np.ndarray],
+        y_true: pd.Series | np.ndarray,
         y_pred: np.ndarray,
-        dates: Optional[pd.Series] = None,
+        dates: pd.Series | None = None,
         save_name: str = "prediction_vs_actual",
-        figsize: Tuple[int, int] = (15, 8),
+        figsize: tuple[int, int] = (15, 8),
     ) -> None:
         """予測値と実際の値の比較プロットを行う
 
@@ -113,7 +111,7 @@ class Visualizer:
             plt.savefig(f"{self.output_dir}/{save_name}_timeseries.png", format="png", dpi=300)
             plt.close()
 
-    def plot_evaluation_metrics(self, metrics: Dict[str, float], save_name: str = "model_metrics") -> None:
+    def plot_evaluation_metrics(self, metrics: dict[str, float], save_name: str = "model_metrics") -> None:
         """評価メトリクスを可視化する
 
         Args:
@@ -149,7 +147,7 @@ class Visualizer:
         plt.close()
 
     def plot_feature_distributions(
-        self, df: pd.DataFrame, columns: List[str] = None, save_name: str = "feature_distributions"
+        self, df: pd.DataFrame, columns: list[str] = None, save_name: str = "feature_distributions",
     ) -> None:
         """特徴量の分布を可視化する
 
@@ -188,7 +186,7 @@ class Visualizer:
         self,
         df: pd.DataFrame,
         save_name: str = "correlation_heatmap",
-        figsize: Tuple[int, int] = None,
+        figsize: tuple[int, int] = None,
         cmap: str = "coolwarm",
     ) -> None:
         """相関ヒートマップを作成する

@@ -1,13 +1,12 @@
-import os
-from typing import Dict, List, Optional, Tuple, Union
 import logging
+import os
 
 import joblib
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from omegaconf import DictConfig
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -17,7 +16,7 @@ logger.addHandler(logging.StreamHandler())
 class PowerForecastModel:
     """電力需要予測モデルクラス"""
 
-    def __init__(self, config: Optional[DictConfig] = None) -> None:
+    def __init__(self, config: DictConfig | None = None) -> None:
         """
         Args:
             config: 設定情報
@@ -30,7 +29,7 @@ class PowerForecastModel:
         self.test_size = self.config.get("test_size", 0.2)
         self.random_state = self.config.get("random_state", 10)
 
-    def train_test_split(self, df: pd.DataFrame, test_date: str = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def train_test_split(self, df: pd.DataFrame, test_date: str = None) -> tuple[pd.DataFrame, pd.DataFrame]:
         """時系列データを訓練データとテストデータに分割する
 
         Args:
@@ -57,8 +56,8 @@ class PowerForecastModel:
         return df_train, df_test
 
     def prepare_data(
-        self, df_train: pd.DataFrame, df_test: pd.DataFrame
-    ) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
+        self, df_train: pd.DataFrame, df_test: pd.DataFrame,
+    ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
         """モデル訓練用にデータを準備する
 
         Args:
@@ -111,7 +110,7 @@ class PowerForecastModel:
 
         return self.model.predict(X)
 
-    def evaluate(self, y_true: pd.Series, y_pred: np.ndarray) -> Dict[str, float]:
+    def evaluate(self, y_true: pd.Series, y_pred: np.ndarray) -> dict[str, float]:
         """モデルを評価する
 
         Args:

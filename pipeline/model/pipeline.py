@@ -3,16 +3,13 @@ import logging
 import os
 import sys
 from datetime import datetime
-from typing import Dict, Optional, Union
-
-import pandas as pd
-from omegaconf import OmegaConf, DictConfig
 
 from data_loader import DataLoader
-from pipeline.model.preprocess import FeatureEngineering
-from model import PowerForecastModel
+from omegaconf import OmegaConf
 from visualization import Visualizer
 
+from model import PowerForecastModel
+from pipeline.model.preprocess import FeatureEngineering
 
 # ロガーの設定
 logging.basicConfig(
@@ -51,7 +48,7 @@ class PowerForecastPipeline:
         self.model = PowerForecastModel(self.config.get("model", {}))
         self.visualizer = Visualizer(self.output_dir)
 
-    def run(self, test_date: Optional[str] = None) -> Dict[str, float]:
+    def run(self, test_date: str | None = None) -> dict[str, float]:
         """パイプラインを実行する
 
         Args:
@@ -97,12 +94,12 @@ class PowerForecastPipeline:
             # 特徴量重要度の可視化
             feature_importance = self.model.get_feature_importance()
             self.visualizer.plot_feature_importance(
-                feature_importance, plot_features=min(20, len(feature_importance)), save_name="feature_importance"
+                feature_importance, plot_features=min(20, len(feature_importance)), save_name="feature_importance",
             )
 
             # 予測と実際の値の比較
             self.visualizer.plot_prediction_vs_actual(
-                y_test, y_pred, dates=df_test["date"], save_name="prediction_vs_actual"
+                y_test, y_pred, dates=df_test["date"], save_name="prediction_vs_actual",
             )
 
             # 評価メトリクスの可視化
@@ -126,7 +123,7 @@ class PowerForecastPipeline:
             return metrics
 
         except Exception as e:
-            logger.error(f"パイプライン実行中にエラーが発生しました: {str(e)}")
+            logger.error(f"パイプライン実行中にエラーが発生しました: {e!s}")
             raise
 
 
