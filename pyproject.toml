@@ -35,6 +35,9 @@ lint.ignore = [
     "PLR0913",
     "ANN002",
     "ANN003",
+    "RUF002",
+    "BLE001",
+    "RET504",
 ]
 target-version = "py311"
 
