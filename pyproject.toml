@@ -9,7 +9,6 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "polars (>=1.29.0,<2.0.0)",
-    "numpy (>=2.2.5,<3.0.0)",
     "pandas (>=2.2.3,<3.0.0)",
     "ruff (>=0.11.8,<0.12.0)",
     "holidays (>=0.72,<0.73)",
@@ -17,10 +16,70 @@ dependencies = [
     "omegaconf (>=2.3.0,<3.0.0)",
     "lightgbm (>=4.6.0,<5.0.0)",
     "seaborn (>=0.13.2,<0.14.0)",
-    "japanize-matplotlib (>=1.1.3,<2.0.0)"
+    "japanize-matplotlib (>=1.1.3,<2.0.0)",
+    "requests (>=2.32.3,<3.0.0)",
+    "sagemaker (>=2.244.0,<3.0.0)",
+    "boto3 (>=1.38.12,<2.0.0)",
+    "mypy (>=1.15.0,<2.0.0)"
 ]
 
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 120
+lint.select = ["ALL"]
+lint.ignore = [
+    "D",
+    "PLR0913",
+    "ANN002",
+    "ANN003",
+    "RUF001",
+    "RUF002",
+    "RUF003",
+    "BLE001",
+    "RET504",
+    "G004",
+    "PD901",
+    "TD002",
+    "TD003",
+    "FIX002",
+    "B006",
+    "PTH118",
+    "PTH208",
+    "N803",
+    "N806",
+    "B904",
+    "FBT003",
+    "UP006",
+    "UP007",
+    "ANN401",
+    "S202",
+    "S301",
+    "S603",
+    "E402",
+    "UP035",
+    "T201",
+    "FBT001",
+    "FBT002",
+    "PLR2004",
+    "PLR0911",
+    "PLR0912",
+    "C901",
+]
+target-version = "py311"
+exclude = [
+    "pipeline/model/mvp.ipynb",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.mypy]
+python_version = "3.6"
+ignore_missing_imports = true
+disallow_untyped_defs = false
+check_untyped_defs = false
+warn_unused_ignores = false

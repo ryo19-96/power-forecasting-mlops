@@ -45,6 +45,16 @@ resource "aws_iam_policy" "power_forecasting_policy" {
             "arn:aws:s3:::power-forecasting-mlops-${terraform.workspace}",
             "arn:aws:s3:::power-forecasting-mlops-${terraform.workspace}/*"
           ]
+        },
+        {
+          Effect = "Allow"
+          Action = [
+            "ecr:GetAuthorizationToken",
+            "ecr:BatchCheckLayerAvailability",
+            "ecr:GetDownloadUrlForLayer",
+            "ecr:BatchGetImage"
+          ]
+          Resource = "*"
         }
       ]
     }
@@ -53,5 +63,40 @@ resource "aws_iam_policy" "power_forecasting_policy" {
 
 resource "aws_iam_role_policy_attachment" "power_forecasting_policy_attachment" {
   role       = aws_iam_role.power_forecasting_role.name
+  policy_arn = aws_iam_policy.power_forecasting_policy.arn
+}
+
+data "aws_iam_role" "studio_execution" {
+  name = "AmazonSageMaker-ExecutionRole-20250507T172311"
+}
+
+resource "aws_iam_policy" "scopedown_ecr_access" {
+  name = "scopedown-ecr-access"
+  path = "/service-role/"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "ecr:GetAuthorizationToken",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "scopedown_attach_ecr_access" {
+  role       = data.aws_iam_role.studio_execution.name
+  policy_arn = aws_iam_policy.scopedown_ecr_access.arn
+}
+
+resource "aws_iam_role_policy_attachment" "studio_attach_forecasting_policy" {
+  role       = data.aws_iam_role.studio_execution.name
   policy_arn = aws_iam_policy.power_forecasting_policy.arn
 }
