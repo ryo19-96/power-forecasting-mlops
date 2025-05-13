@@ -187,12 +187,11 @@ def get_pipeline(
     )
 
     # training step for generating model artifacts
-    training_instance_type = ParameterString(name="TrainingInstanceType", default_value="ml.t3.medium")
+    training_instance_type = ParameterString(name="TrainingInstanceType", default_value="ml.m5.large")
     training_instance_count = ParameterInteger(name="TrainingInstanceCount", default_value=1)
 
     model_path = f"s3://{sagemaker_session.default_bucket()}/{base_job_prefix}/Train"
     train_model_id, train_model_version = "lightgbm-regression-model", "*"
-    training_instance_type = "ml.m5.large"
     lgbm_hyperparameters = hyperparameters.retrieve_default(
         model_id=train_model_id,
         model_version=train_model_version,
