@@ -1,5 +1,8 @@
+# jumpstartのビルトインモデルを使用するのでこのファイルは不要
+# TODO: train_test_splitなどは他のstepで実装するのでここから削除する
+
 import logging
-import os
+from pathlib import Path
 
 import joblib
 import lightgbm as lgb
@@ -29,7 +32,7 @@ class PowerForecastModel:
         self.test_size = self.config.get("test_size", 0.2)
         self.random_state = self.config.get("random_state", 10)
 
-    def train_test_split(self, df: pd.DataFrame, test_date: str = None) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def train_test_split(self, df: pd.DataFrame, test_date: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
         """時系列データを訓練データとテストデータに分割する
 
         Args:
@@ -56,7 +59,9 @@ class PowerForecastModel:
         return df_train, df_test
 
     def prepare_data(
-        self, df_train: pd.DataFrame, df_test: pd.DataFrame,
+        self,
+        df_train: pd.DataFrame,
+        df_test: pd.DataFrame,
     ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
         """モデル訓練用にデータを準備する
 
@@ -106,7 +111,8 @@ class PowerForecastModel:
             np.ndarray: 予測値
         """
         if self.model is None:
-            raise ValueError("モデルが未訓練です。")
+            msg = "モデルが未訓練です。"
+            raise ValueError(msg)
 
         return self.model.predict(X)
 
@@ -136,10 +142,11 @@ class PowerForecastModel:
             filepath: 保存先のパス
         """
         if self.model is None:
-            raise ValueError("モデルが訓練されていません。先にtrain()を呼び出してください。")
+            msg = "モデルが訓練されていません。先にtrain()を呼び出してください。"
+            raise ValueError(msg)
 
         # ディレクトリがなければ作成
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        Path(filepath).parent.mkdir(parents=True, exist_ok=True)
 
         # モデルを保存
         joblib.dump(self.model, filepath)
@@ -159,7 +166,8 @@ class PowerForecastModel:
             pd.DataFrame: 特徴量名と重要度を含むデータフレーム
         """
         if self.model is None:
-            raise ValueError("モデルが訓練されていません。")
+            msg = "モデルが訓練されていません。"
+            raise ValueError(msg)
 
         df_importance = pd.DataFrame({"feature": self.feature_names, "importance": self.feature_importances})
 

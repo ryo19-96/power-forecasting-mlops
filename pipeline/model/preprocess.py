@@ -1,30 +1,71 @@
-import datetime
-from typing import Dict, List, Optional, Union
+import subprocess
+import sys
+import os
+
+# 必要なパッケージをその場でインストール
+subprocess.run(
+    [sys.executable, "-m", "pip", "install", "--quiet", "holidays", "omegaconf", "category-encoders"], check=True
+)
+sys.path.append("/opt/ml/processing/deps")
 import logging
 
 import holidays
 import numpy as np
 import pandas as pd
-from omegaconf import DictConfig
+from typing import Union, Tuple
+from pathlib import Path
+from omegaconf import DictConfig, OmegaConf
 
-from common.feature_encoder import FeatureEncoder
+from feature_encoder import FeatureEncoder
+import argparse
+import pathlib
+import json
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
+HOT_DAY_THRESHOLD = 30
+COLD_DAY_THRESHOLD = 5
+
+
+def load_config(config_path: str) -> DictConfig:
+    """設定ファイルを読み込む
+
+    Args:
+        config_path: 設定ファイルのパス
+
+    Returns:
+        DictConfig: 設定情報
+    """
+    config = DictConfig(OmegaConf.load(config_path))
+    return config
+
+
+def load_data(file_path: str) -> pd.DataFrame:
+    """データを読み込む
+
+    Args:
+        file_path: データファイルのパス
+
+    Returns:
+        pd.DataFrame: 読み込んだデータフレーム
+    """
+    df = pd.read_pickle(file_path)
+    return df
+
 
 class FeatureEngineering:
     """特徴量エンジニアリングを行うクラス"""
 
-    def __init__(self, config: Optional[DictConfig] = None) -> None:
+    def __init__(self, config: Union[DictConfig, None] = None) -> None:
         """
         Args:
             config: 設定情報（省略可能）
         """
         self.config = config
         self.encoders_dict = {}
-        self.jp_holidays = holidays.Japan()
+        self.jp_holidays = holidays.Japan()  # type: ignore[attr-defined]
 
     def categorize_weather(self, weather_df: pd.DataFrame, weather_col: str = "weather") -> pd.DataFrame:
         """天気の文字列を基本的なカテゴリに分類する
@@ -127,10 +168,10 @@ class FeatureEngineering:
         result_df["hdd"] = (18 - result_df["avg"]).clip(lower=0)
 
         # 猛暑日フラグ（最高気温が30℃以上か）
-        result_df["hot"] = (df["max_temp"] >= 30).astype(int)
+        result_df["hot"] = (df["max_temp"] >= HOT_DAY_THRESHOLD).astype(int)
 
         # 冬日フラグ（最低気温が5℃以下か）
-        result_df["cold"] = (df["min_temp"] <= 5).astype(int)
+        result_df["cold"] = (df["min_temp"] <= COLD_DAY_THRESHOLD).astype(int)
 
         return result_df
 
@@ -198,7 +239,7 @@ class FeatureEngineering:
 
         return result_df
 
-    def make_features(self, df: pd.DataFrame) -> pd.DataFrame:
+    def make_features(self, df: pd.DataFrame, date_col: str = "date") -> pd.DataFrame:
         """データフレーム全体に対して特徴量を作成する
 
         Args:
@@ -214,7 +255,7 @@ class FeatureEngineering:
         df = self.create_numeric_features(df)
 
         # カレンダー特徴量作成
-        df = self.create_calendar_features(df)
+        df = self.create_calendar_features(df, date_col=date_col)
 
         # configでエンコーダーの指定があればエンコーダーを適用
         if self.config and "encoders" in self.config:
@@ -223,18 +264,94 @@ class FeatureEngineering:
         return df
 
 
+def format_target_first(df: pd.DataFrame, target_col: str = "max_power") -> pd.DataFrame:
+    """目的変数を明示的に最初のカラムに移動する
+    Args:
+        df: 入力データフレーム
+        target_col: 目的変数のカラム名
+
+    Returns:
+        pd.DataFrame: 目的変数が最初のカラムに移動したデータフレーム
+
+    Notes:
+        awsのビルドインモデルを使用した場合先頭列に目的変数が必要なため列の順番を変更する
+    """
+    y = df.pop(target_col)
+    return pd.concat([y, df], axis=1)
+
+
+def train_test_split(
+    df: pd.DataFrame,
+    test_date: Union[str, None] = None,
+    test_size: float = 0.2,
+    date_col: str = "date",
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    時系列データを訓練データとテストデータに分割する
+
+    Args:
+        df: 入力データフレーム
+        test_date: テストデータの開始日付（例: '2024-10-01'）
+                    指定がない場合は、test_sizeに基づいて分割
+        test_size: テストデータの割合（test_dateが指定されていない場合に使用）
+
+    Returns:
+        Tuple[pd.DataFrame, pd.DataFrame]: 訓練データとテストデータ
+    """
+    df = format_target_first(df)
+    # 日付でソート
+    df_sorted = df.sort_values(date_col)
+
+    if test_date:
+        # 指定した日付で分割
+        df_train = df_sorted[df_sorted[date_col] < test_date]
+        df_test = df_sorted[df_sorted[date_col] >= test_date]
+    else:
+        # データ数に基づいて分割
+        train_size = int(len(df_sorted) * (1 - test_size))
+        df_train = df_sorted.iloc[:train_size]
+        df_test = df_sorted.iloc[train_size:]
+
+    df_train = df_train.drop(columns=[date_col]).reset_index(drop=True)
+    df_test = df_test.drop(columns=[date_col]).reset_index(drop=True)
+
+    return df_train, df_test
+
+
+def save_column_names(df: pd.DataFrame, output_path: str = "/opt/ml/processing/train/features.txt") -> None:
+    """特徴量重要度のプロットのためカラム名を保存する
+
+    Args:
+        df: 入力データフレーム
+        output_path: 出力パス
+    """
+    feature_names = df.columns.tolist()
+
+    with open(output_path, "w") as f:
+        for name in feature_names:
+            f.write(f"{name}\n")
+
+
 if __name__ == "__main__":
-    import argparse
-
+    logger.info("Starting processing data...")
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=str, required=True)
-    parser.add_argument("--output", type=str, required=True)
+    parser.add_argument("--input-data", type=str)
     args = parser.parse_args()
+    input_path = args.input_data
+    base_dir = "/opt/ml/processing"
 
-    input_path = args.input
-    output_path = args.output
+    config = load_config("/opt/ml/processing/deps/config.yaml")
+    data = load_data(input_path)
+    feature_engineering = FeatureEngineering(config=config)
+    # データの前処理
+    processed_data = feature_engineering.make_features(data)
+    train_data, test_data = train_test_split(processed_data, test_date="2024-10-01")
+    # カラム名を保存
+    save_column_names(train_data, output_path=f"{base_dir}/train/features.txt")
 
-    df = pd.read_csv(input_path)
-    feature_engineering = FeatureEngineering()
-    processed_data = feature_engineering.make_features(df)
-    feature_engineering.save_processed_data(processed_data, output_path)
+    # データの保存
+    Path(f"{base_dir}/train").mkdir(parents=True, exist_ok=True)
+    train_data.to_csv(f"{base_dir}/train/train.csv", index=False, header=False)
+    Path(f"{base_dir}/test").mkdir(parents=True, exist_ok=True)
+    test_data.to_csv(f"{base_dir}/test/test.csv", index=False, header=False)
+    logger.info("Finished processing data...")

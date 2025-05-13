@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Union, List, Any
 
 import boto3
 import sagemaker
@@ -18,6 +19,9 @@ from sagemaker.workflow.pipeline import Pipeline
 from sagemaker.workflow.properties import PropertyFile
 from sagemaker.workflow.step_collections import RegisterModel
 from sagemaker.workflow.steps import ProcessingStep, TrainingStep
+from sagemaker.workflow.functions import Join
+from sagemaker.jumpstart.estimator import JumpStartEstimator
+
 
 BASE_DIR = Path(__file__).parent
 
@@ -28,7 +32,7 @@ def get_sagemaker_client(region: str) -> BaseClient:
     return boto_session.client("sagemaker")
 
 
-def get_session(region: str, default_bucket: str) -> sagemaker.session.Session:
+def get_session(region: str, default_bucket: Union[str, None]) -> sagemaker.session.Session:
     """セッションを取得する関数（接続ハブのような役割を果たす）
     Args:
         region (str): AWSリージョン
@@ -49,7 +53,7 @@ def get_session(region: str, default_bucket: str) -> sagemaker.session.Session:
     )
 
 
-def get_pipeline_custom_tags(new_tags: any, region: str, sagemaker_project_arn: str | None = None) -> list:
+def get_pipeline_custom_tags(new_tags: Any, region: str, sagemaker_project_arn: Union[str, None] = None) -> List:
     try:
         sm_client = get_sagemaker_client(region)
         response = sm_client.list_tags(ResourceArn=sagemaker_project_arn)
@@ -57,15 +61,16 @@ def get_pipeline_custom_tags(new_tags: any, region: str, sagemaker_project_arn: 
         for project_tag in project_tags:
             new_tags.append(project_tag)
     except Exception as e:
-        print(f"Error getting project tags: {e}")
+        msg = f"Error getting project tags: {e}"
+        raise RuntimeError(msg)
     return new_tags
 
 
 def get_pipeline(
     region: str,
     # sagemaker_project_arn: str | None = None,
-    role: str | None = None,
-    default_bucket: str | None = None,
+    role: Union[str, None] = None,
+    default_bucket: Union[str, None] = None,
     model_package_group_name: str = "PowerForecastPackageGroup",
     pipeline_name: str = "PowerForecastPipeline",
     base_job_prefix: str = "PowerForecast",
@@ -107,9 +112,16 @@ def get_pipeline(
         default_value="ml.t3.medium",
     )
 
-    # データをロードするステップ
+    # データをロードして結合するステップ
+    image_uri = sagemaker.image_uris.retrieve(
+        framework="sklearn",
+        region="ap-northeast-1",
+        version="0.23-1",
+        py_version="py3",
+        instance_type="ml.t3.medium",
+    )
     data_loader_script_processor = ScriptProcessor(
-        image_uri="763104351884.dkr.ecr.us-west-2.amazonaws.com/sklearn-processing:0.23-1-cpu-py3",
+        image_uri=image_uri,
         command=["python3"],
         instance_type=processing_instance_type,
         instance_count=processing_instance_count,
@@ -124,17 +136,23 @@ def get_pipeline(
         inputs=[
             ProcessingInput(
                 source=weather_input_data,
-                destination="/opt/ml/processing/input_data",  # コンテナ内のマウント先
+                destination="/opt/ml/processing/input/weather",  # コンテナ内のマウント先
                 input_name="weather_data",
             ),
             ProcessingInput(
                 source=power_usage_input_data,
-                destination="/opt/ml/processing/input_data",
+                destination="/opt/ml/processing/input/power_usage",
                 input_name="power_usage_data",
             ),
         ],
         outputs=[ProcessingOutput(output_name="merged_data", source="/opt/ml/processing/output")],
-        code=Path.join(BASE_DIR, "data_loader.py"),
+        code=str(BASE_DIR / "data_loader.py"),
+        job_arguments=[
+            "--weather-input-data",
+            "/opt/ml/processing/input/weather/weather_data.csv",
+            "--power-usage-input-data",
+            "/opt/ml/processing/input/power_usage/",
+        ],
     )
 
     # 特徴量エンジニアリングのステップ
@@ -156,13 +174,17 @@ def get_pipeline(
                 destination="/opt/ml/processing/input_data",
                 input_name="merged_data",
             ),
+            ProcessingInput(source=str(BASE_DIR), destination="/opt/ml/processing/deps"),
         ],
         outputs=[
             ProcessingOutput(output_name="train", source="/opt/ml/processing/train"),
             ProcessingOutput(output_name="test", source="/opt/ml/processing/test"),
         ],
-        code=Path.join(BASE_DIR, "preprocess.py"),
-        job_arguments=["--weather_input-data", weather_input_data, "--power_usage_input-data", power_usage_input_data],
+        code=str(BASE_DIR / "preprocess.py"),
+        job_arguments=[
+            "--input-data",
+            "/opt/ml/processing/input_data/merged_data.pkl",
+        ],
     )
 
     # training step for generating model artifacts
@@ -170,23 +192,18 @@ def get_pipeline(
     training_instance_count = ParameterInteger(name="TrainingInstanceCount", default_value=1)
 
     model_path = f"s3://{sagemaker_session.default_bucket()}/{base_job_prefix}/Train"
-    train_model_id, train_model_version, train_scope = "lightgbm-regression-model", "*", "training"
-    training_instance_type = "ml.t3.medium"
+    train_model_id, train_model_version = "lightgbm-regression-model", "*"
+    training_instance_type = "ml.m5.large"
     lgbm_hyperparameters = hyperparameters.retrieve_default(
         model_id=train_model_id,
         model_version=train_model_version,
     )
+    lgbm_hyperparameters["metric"] = "auto"
     # 実行環境となるコンテナイメージを取得
-    image_uri = sagemaker.image_uris.retrieve(
-        region=region,
-        framework=None,
+    # jumpstartのビルトインモデルを使用する
+    lgbm_train = JumpStartEstimator(
         model_id=train_model_id,
         model_version=train_model_version,
-        image_scope=train_scope,
-        instance_type=training_instance_type,
-    )
-    lgbm_train = Estimator(
-        image_uri=image_uri,
         instance_type=training_instance_type,
         instance_count=training_instance_count,
         output_path=model_path,
@@ -208,8 +225,15 @@ def get_pipeline(
     )
 
     # モデルの評価ステップを追加
+    # 評価の結果をevaluation.jsonに出力する
+    evaluation_report = PropertyFile(
+        name="EvaluationReport",
+        output_name="evaluation",
+        path="evaluation.json",
+    )
+
     evaluation_script_processor = ScriptProcessor(
-        image_uri="763104351884.dkr.ecr.us-west-2.amazonaws.com/sklearn-processing:0.23-1-cpu-py3",
+        image_uri=image_uri,
         command=["python3"],
         instance_type=processing_instance_type,
         instance_count=processing_instance_count,
@@ -228,18 +252,34 @@ def get_pipeline(
                 input_name="model",
             ),
             ProcessingInput(
+                source=step_process.properties.ProcessingOutputConfig.Outputs["train"].S3Output.S3Uri,
+                destination="/opt/ml/processing/train",
+                input_name="train_data",
+            ),
+            ProcessingInput(
                 source=step_process.properties.ProcessingOutputConfig.Outputs["test"].S3Output.S3Uri,
                 destination="/opt/ml/processing/test",
                 input_name="test_data",
             ),
         ],
         outputs=[ProcessingOutput(output_name="evaluation", source="/opt/ml/processing/evaluation")],
-        code=Path.join(BASE_DIR, "evaluate.py"),
+        code=str(BASE_DIR / "evaluate.py"),
+        property_files=[evaluation_report],
+        job_arguments=[
+            "--model-path",
+            "/opt/ml/processing/model/model.tar.gz",
+            "--test-path",
+            "/opt/ml/processing/test/test.csv",
+            "--feature-names-path",
+            "/opt/ml/processing/train/features.txt",
+            "--output-path",
+            "/opt/ml/processing/evaluation",
+        ],
     )
 
     # 可視化ステップを追加
     visualization_script_processor = ScriptProcessor(
-        image_uri="763104351884.dkr.ecr.us-west-2.amazonaws.com/sklearn-processing:0.23-1-cpu-py3",
+        image_uri=image_uri,
         command=["python3"],
         instance_type=processing_instance_type,
         instance_count=processing_instance_count,
@@ -247,32 +287,54 @@ def get_pipeline(
         sagemaker_session=sagemaker_session,
         role=role,
     )
-
+    # UI用の画像を出すのか、HTMLレポートを作るのか、ログだけなのかなど、可視化の目的と出力フォーマットを後で
+    # はっきりさせておくと良い。S3Uri + ファイル名 で保存場所を明確にしておくと、Looker や BIツールとの連携も楽
     step_visualization = ProcessingStep(
         name="VisualizeResults",
         processor=visualization_script_processor,
         inputs=[
             ProcessingInput(
-                source=step_evaluate.properties.ProcessingOutputConfig.Outputs["evaluation"].S3Output.S3Uri,
-                destination="/opt/ml/processing/evaluation",
-                input_name="evaluation_data",
+                source=step_train.properties.ModelArtifacts.S3ModelArtifacts,
+                destination="/opt/ml/processing/model",
+                input_name="model",
+            ),
+            ProcessingInput(
+                source=step_process.properties.ProcessingOutputConfig.Outputs["train"].S3Output.S3Uri,
+                destination="/opt/ml/processing/train",
+                input_name="train_data",
+            ),
+            ProcessingInput(
+                source=step_process.properties.ProcessingOutputConfig.Outputs["test"].S3Output.S3Uri,
+                destination="/opt/ml/processing/test",
+                input_name="test_data",
             ),
         ],
         outputs=[ProcessingOutput(output_name="visualizations", source="/opt/ml/processing/visualizations")],
-        code=Path.join(BASE_DIR, "visualization.py"),
+        code=str(BASE_DIR / "visualization.py"),
+        job_arguments=[
+            "--model-path",
+            "/opt/ml/processing/model/model.tar.gz",
+            "--test-path",
+            "/opt/ml/processing/test/test.csv",
+            "--feature-names-path",
+            "/opt/ml/processing/train/features.txt",
+            "--output-path",
+            "/opt/ml/processing/visualizations",
+        ],
     )
 
     # モデル登録ステップを条件付きで追加する
-    evaluation_report = PropertyFile(
-        name="EvaluationReport",
-        output_name="evaluation",
-        path="evaluation.json",
+    evaluation_json_uri = Join(
+        on="/",
+        values=[
+            step_evaluate.properties.ProcessingOutputConfig.Outputs["evaluation"].S3Output.S3Uri,
+            "evaluation.json",
+        ],
     )
 
     model_metrics = ModelMetrics(
         model_statistics=MetricsSource(
-            s3_uri=step_evaluate.properties.ProcessingOutputConfig.Outputs["evaluation"].S3Output.S3Uri
-            + "/evaluation.json",
+            s3_uri=evaluation_json_uri,
             content_type="application/json",
         ),
     )
@@ -283,15 +345,15 @@ def get_pipeline(
         model_data=step_train.properties.ModelArtifacts.S3ModelArtifacts,
         content_types=["text/csv"],
         response_types=["text/csv"],
-        # モデル利用者のために動作できるinstanceを記録しておくらしい
-        inference_instances=["ml.t2.medium"],
-        transform_instances=["ml.t2.medium"],
+        inference_instances=["ml.m5.large"],
+        transform_instances=["ml.m5.large"],
         model_package_group_name=model_package_group_name,
-        approval_status="PendingManualApproval",
+        approval_status="Approved",
         model_metrics=model_metrics,
     )
 
     # モデル品質を評価し、分岐実行を行う条件ステップ
+    # TODO: configファイルから取得するように変更する
     cond_lte = ConditionLessThanOrEqualTo(
         left=JsonGet(
             step_name=step_evaluate.name,

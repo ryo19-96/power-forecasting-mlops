@@ -1,28 +1,129 @@
-import os
+import subprocess
+import sys
 
+# 必要なパッケージをその場でインストール（1回目だけ多少遅い）
+subprocess.run(
+    [
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "--quiet",
+        "seaborn",
+        "lightgbm",
+        "matplotlib",
+        "japanize-matplotlib",
+        "scikit-learn",
+    ],
+    check=True,
+)
+import os
+import argparse
+import logging
+from pathlib import Path
+import tarfile
+import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from typing import Union, Dict, Any, List, Tuple
+import lightgbm as lgb
+from scipy.sparse import spmatrix
+import japanize_matplotlib
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logger.addHandler(logging.StreamHandler())
 
 
 class Visualizer:
     """モデルの評価や特徴量の可視化を行うクラス"""
 
-    def __init__(self, output_dir: str = "./output") -> None:
+    def __init__(self, output_dir: str, model: Any, feature_names_path: str) -> None:
         """
         Args:
             output_dir: 出力ディレクトリ
         """
         self.output_dir = output_dir
-        os.makedirs(output_dir, exist_ok=True)
+        Path(self.output_dir).mkdir(parents=True, exist_ok=True)
+        self.model = model
+        self.feature_names_path = feature_names_path
+        self.feature_names = self.get_feature_names(feature_names_path)
+
+    def load_test_data(
+        self,
+        test_data_path: str,
+        target_col: str = "max_power",
+    ) -> Tuple[pd.DataFrame, pd.Series]:
+        """テストデータを読み込んで必要なデータを返す
+
+        Args:
+            test_data_path (str): テストデータのパス
+            target_col (str): 目的変数のカラム名
+
+        Returns:
+            Tuple[pd.DataFrame, pd.Series]: 特徴量データと目的変数データ
+        """
+        test_data = pd.read_csv(test_data_path, names=self.feature_names, header=None)
+        X_test = test_data.drop(columns=[target_col])
+        y_true = test_data[target_col]
+        return X_test, y_true
+
+    def evaluate(self, y_true: pd.Series, y_pred: Union[np.ndarray, pd.Series, spmatrix]) -> Dict[str, float]:
+        """モデルを評価する
+
+        Args:
+            y_true: 実際の値
+            y_pred: 予測値
+
+        Returns:
+            Dict[str, float]: 評価メトリクスの辞書
+        """
+        metrics = {
+            "rmse": np.sqrt(mean_squared_error(y_true, y_pred)),
+            "mse": mean_squared_error(y_true, y_pred),
+            "mae": mean_absolute_error(y_true, y_pred),
+            "r2": r2_score(y_true, y_pred),
+        }
+
+        return metrics
+
+    def get_feature_names(self, feature_name_path: str) -> List[str]:
+        """モデルの特徴量名を取得する
+
+        Returns:
+            List[str]: 特徴量名のリスト
+        """
+        with open(feature_name_path, "r") as f:
+            feature_names = [line.strip() for line in f if line.strip()]
+        return feature_names
+
+    def get_feature_importance(self) -> pd.DataFrame:
+        """特徴量重要度を取得する
+        使用するlightgbmのインターフェースによって異なるため、条件分岐で取得する
+
+        Returns:
+            pd.DataFrame: 特徴量と重要度を含むデータフレーム
+        """
+        if hasattr(self.model, "feature_name_") and hasattr(self.model, "feature_importances_"):
+            importances = self.model.feature_importances_
+        elif hasattr(self.model, "feature_name") and hasattr(self.model, "feature_importance"):
+            importances = self.model.feature_importance()
+        else:
+            msg = "モデルの特徴量取得に失敗しました"
+            raise ValueError(msg)
+        # 特徴量名の先頭は目的変数のため除外して渡す
+        df_importance = pd.DataFrame({"feature": self.feature_names[1:], "importance": importances})
+        return df_importance.sort_values("importance", ascending=False)
 
     def plot_feature_importance(
         self,
         feature_importance_df: pd.DataFrame,
         plot_features: int = 20,
         save_name: str = "feature_importance",
-        figsize: tuple[int, int] = None,
+        figsize: Union[Tuple[int, int], None] = None,
     ) -> None:
         """特徴量重要度のプロットを行う
 
@@ -57,11 +158,11 @@ class Visualizer:
 
     def plot_prediction_vs_actual(
         self,
-        y_true: pd.Series | np.ndarray,
+        y_true: Union[pd.Series, np.ndarray],
         y_pred: np.ndarray,
-        dates: pd.Series | None = None,
+        dates: Union[pd.Series, None] = None,
         save_name: str = "prediction_vs_actual",
-        figsize: tuple[int, int] = (15, 8),
+        figsize: Tuple[int, int] = (15, 8),
     ) -> None:
         """予測値と実際の値の比較プロットを行う
 
@@ -111,7 +212,7 @@ class Visualizer:
             plt.savefig(f"{self.output_dir}/{save_name}_timeseries.png", format="png", dpi=300)
             plt.close()
 
-    def plot_evaluation_metrics(self, metrics: dict[str, float], save_name: str = "model_metrics") -> None:
+    def plot_evaluation_metrics(self, metrics: Dict[str, float], save_name: str = "model_metrics") -> None:
         """評価メトリクスを可視化する
 
         Args:
@@ -147,7 +248,10 @@ class Visualizer:
         plt.close()
 
     def plot_feature_distributions(
-        self, df: pd.DataFrame, columns: list[str] = None, save_name: str = "feature_distributions",
+        self,
+        df: pd.DataFrame,
+        columns: Union[List[str], None] = None,
+        save_name: str = "feature_distributions",
     ) -> None:
         """特徴量の分布を可視化する
 
@@ -186,7 +290,7 @@ class Visualizer:
         self,
         df: pd.DataFrame,
         save_name: str = "correlation_heatmap",
-        figsize: tuple[int, int] = None,
+        figsize: Union[Tuple[int, int], None] = None,
         cmap: str = "coolwarm",
     ) -> None:
         """相関ヒートマップを作成する
@@ -221,20 +325,89 @@ class Visualizer:
         plt.close()
 
 
+def load_model(model_tar_path: str) -> lgb.Booster:
+    """model.tar.gz から model.pickle を取り出してモデルを返す
+    Args:
+        model_tar_path (str): モデルのtar.gzファイルのパス
+    Returns:
+        lgb.Booster: 学習済みモデル
+    """
+    # 解凍
+    # ① 展開
+    extract_dir = "/tmp/model"
+    Path(extract_dir).mkdir(exist_ok=True)
+    with tarfile.open(model_tar_path, "r:gz") as tar:
+        tar.extractall(path=extract_dir)
+
+    model_path = next(Path(extract_dir).rglob("model.pkl"))
+
+    return joblib.load(model_path)
+
+
 if __name__ == "__main__":
-    import argparse
+    logger.info("Starting visualization...")
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--evaluation_data", type=str, required=True)
-    parser.add_argument("--output", type=str, required=True)
+    parser.add_argument("--model-path", type=str)
+    parser.add_argument("--test-path", type=str)
+    parser.add_argument("--feature-names-path", type=str)
+    parser.add_argument("--output-path", type=str)
     args = parser.parse_args()
+    # コマンドライン引数の取得
+    model_path = args.model_path
+    test_data_path = args.test_path
+    feature_names_path = args.feature_names_path
+    output_path = args.output_path
 
-    evaluation_data_path = args.evaluation_data
-    output_path = args.output
-
-    # 評価データのロード
-    evaluation_data = pd.read_json(evaluation_data_path)
+    # モデルのロード
+    model = load_model(model_path)
 
     # 可視化の実行
-    visualizer = Visualizer(output_dir=output_path)
-    visualizer.plot_evaluation_metrics(evaluation_data.to_dict(), save_name="model_metrics")
+    visualizer = Visualizer(output_dir=output_path, model=model, feature_names_path=feature_names_path)
+
+    # テストデータのロード
+    X_test, y_true = visualizer.load_test_data(test_data_path)
+
+    # 予測と評価
+    y_pred = model.predict(X_test)
+    metrics = visualizer.evaluate(y_true, y_pred)
+
+    # 特徴量重要度の取得
+    feature_importance = visualizer.get_feature_importance()
+
+    # 特徴量重要度の可視化
+    visualizer.plot_feature_importance(
+        feature_importance,
+        plot_features=min(20, len(feature_importance)),
+        save_name="feature_importance",
+    )
+
+    # 予実の比較
+    # dateカラムを作成
+    X_test["date"] = pd.to_datetime(
+        {
+            "year": X_test["year"],
+            "month": X_test["month"],
+            "day": X_test["day"],
+        },
+    )
+    visualizer.plot_prediction_vs_actual(
+        y_true,
+        y_pred,
+        dates=X_test["date"],
+        save_name="prediction_vs_actual",
+    )
+    # 評価メトリクスの可視化
+    visualizer.plot_evaluation_metrics(metrics, save_name="model_metrics")
+
+    # 特徴量の分布の可視化
+    visualizer.plot_feature_distributions(
+        X_test,
+        columns=X_test.select_dtypes(include=["int64", "float64"]).columns.tolist(),
+        save_name="feature_distributions",
+    )
+
+    # ヒートマップの作成
+    visualizer.correlation_heatmap(X_test, save_name="correlation_heatmap")
+
+    logger.info("finished visualization...")

@@ -1,8 +1,10 @@
 import logging
 import os
 import zipfile
-
+import argparse
+import pathlib
 import pandas as pd
+from typing import List
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -12,7 +14,7 @@ logger.addHandler(logging.StreamHandler())
 class DataLoader:
     """データ読み込みを担当するクラス"""
 
-    def __init__(self, config: dict = None) -> None:
+    def __init__(self, weather_data_path: str, power_usage_data_path: str) -> None:
         """
         Args:
             config: 設定情報の辞書
@@ -20,12 +22,10 @@ class DataLoader:
                 - weather_file: 気象データファイル名
                 - power_usage_dir: 電力使用量データディレクトリ名
         """
-        self.config = config or {}
-        self.data_dir = self.config.get("data_dir", "../../data")
-        self.weather_file = self.config.get("weather_file", "weather_data.csv")
-        self.power_usage_dir = self.config.get("power_usage_dir", "power_usage")
+        self.weather_file = weather_data_path
+        self.power_usage_dir = power_usage_data_path
 
-    def load_weather_data(self, encoding: str = "shift-jis", skiprows: list[int] = [0, 1, 2, 4, 5]) -> pd.DataFrame:
+    def load_weather_data(self, encoding: str = "shift-jis", skiprows: List[int] = [0, 1, 2, 4, 5]) -> pd.DataFrame:
         """気象データファイルを読み込む
 
         Args:
@@ -35,8 +35,7 @@ class DataLoader:
         Returns:
             pd.DataFrame: 気象データフレーム
         """
-        weather_path = os.path.join(self.data_dir, self.weather_file)
-        df = pd.read_csv(weather_path, encoding=encoding, skiprows=skiprows)
+        df = pd.read_csv(self.weather_file, encoding=encoding, skiprows=skiprows)
 
         # 必要なカラムだけ抽出
         df = df[["年月日", "最高気温(℃)", "最低気温(℃)", "天気概況(昼：06時〜18時)"]]
@@ -62,7 +61,7 @@ class DataLoader:
         Returns:
             pd.DataFrame: 電力使用量データフレーム
         """
-        zip_dir = os.path.join(self.data_dir, self.power_usage_dir)
+        zip_dir = self.power_usage_dir
         result = []
 
         # ZIP内のCSVファイルからデータを読み込む
@@ -103,20 +102,41 @@ class DataLoader:
         # dateカラムを使って両方のデータフレームを結合
         return weather_df.merge(power_usage_df, on="date", how="inner")
 
+    def format_target_first(self, df: pd.DataFrame, target_col: str = "max_power") -> pd.DataFrame:
+        """目的変数を明示的に最初のカラムに移動する
+        Args:
+            df: 入力データフレーム
+            target_col: 目的変数のカラム名
+
+        Returns:
+            pd.DataFrame: 目的変数が最初のカラムに移動したデータフレーム
+
+        Notes:
+            awsのビルドインモデルを使用した場合先頭列に目的変数が必要なため列の順番を変更する
+        """
+        y = df.pop(target_col)
+        return pd.concat([y, df], axis=1)
+
 
 if __name__ == "__main__":
-    import argparse
+    logger.info("Starting load data...")
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--weather_input", type=str, required=True)
-    parser.add_argument("--power_usage_input", type=str, required=True)
-    parser.add_argument("--output", type=str, required=True)
+    parser.add_argument("--weather-input-data", type=str)
+    parser.add_argument("--power-usage-input-data", type=str)
     args = parser.parse_args()
 
-    data_loader = DataLoader()
-    weather_data = data_loader.load_weather_data()
-    power_usage_data = data_loader.load_power_usage_data()
+    base_dir = "/opt/ml/processing"
+
+    weather_input_data_path = args.weather_input_data
+    power_usage_input_data_path = args.power_usage_input_data
+
+    data_loader = DataLoader(
+        weather_data_path=weather_input_data_path,
+        power_usage_data_path=power_usage_input_data_path,
+    )
     merged_data = data_loader.merge_data()
 
-    output_path = args.output
-    data_loader.save_to_s3(merged_data, output_path)
+    pathlib.Path(f"{base_dir}/output").mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(merged_data).to_pickle(f"{base_dir}/output/merged_data.pkl")
+    logger.info("Finished loading data...")

@@ -1,4 +1,4 @@
-
+from typing import List
 import category_encoders as ce
 import pandas as pd
 
@@ -9,7 +9,7 @@ class FeatureEncoder:
     One-Hot EncodingとOrdinal Encodingに対応
     """
 
-    def __init__(self, name: str, columns: list[str]) -> None:
+    def __init__(self, name: str, columns: List[str]) -> None:
         """
         Args:
             name (str): Encoderの仕方を指定
@@ -52,5 +52,4 @@ class FeatureEncoder:
         Returns:
             pd.DataFrame: エンコードされたデータ
         """
-        assert self.fitted, f"{self.name} is not fitted yet."
         return self.encoder.transform(input_df)
