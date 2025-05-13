@@ -17,20 +17,20 @@ subprocess.run(
     ],
     check=True,
 )
-import os
 import argparse
 import logging
-from pathlib import Path
 import tarfile
+from pathlib import Path
+from typing import Any, Dict, List, Tuple, Union
+
+import japanize_matplotlib  # noqa: F401
 import joblib
+import lightgbm as lgb
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from typing import Union, Dict, Any, List, Tuple
-import lightgbm as lgb
 from scipy.sparse import spmatrix
-import japanize_matplotlib
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 logger = logging.getLogger()
@@ -96,7 +96,7 @@ class Visualizer:
         Returns:
             List[str]: 特徴量名のリスト
         """
-        with open(feature_name_path, "r") as f:
+        with Path(feature_name_path).open() as f:
             feature_names = [line.strip() for line in f if line.strip()]
         return feature_names
 
@@ -333,8 +333,7 @@ def load_model(model_tar_path: str) -> lgb.Booster:
         lgb.Booster: 学習済みモデル
     """
     # 解凍
-    # ① 展開
-    extract_dir = "/tmp/model"
+    extract_dir = "/tmp/model"  # noqa: S108
     Path(extract_dir).mkdir(exist_ok=True)
     with tarfile.open(model_tar_path, "r:gz") as tar:
         tar.extractall(path=extract_dir)

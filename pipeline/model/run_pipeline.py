@@ -1,9 +1,5 @@
-import sys
-from pathlib import Path
 
-import sagemaker
 from pipeline_aws import get_pipeline
-import sagemaker.session
 
 region = "ap-northeast-1"
 role = "arn:aws:iam::163817410757:role/service-role/AmazonSageMaker-ExecutionRole-20250507T172311"

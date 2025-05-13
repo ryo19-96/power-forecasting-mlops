@@ -1,27 +1,24 @@
 from pathlib import Path
-from typing import Union, List, Any
+from typing import Any, List, Union
 
 import boto3
 import sagemaker
 import sagemaker.session
 from botocore.client import BaseClient
 from sagemaker import hyperparameters
-from sagemaker.estimator import Estimator
 from sagemaker.inputs import TrainingInput
+from sagemaker.jumpstart.estimator import JumpStartEstimator
 from sagemaker.model_metrics import MetricsSource, ModelMetrics
 from sagemaker.processing import ProcessingInput, ProcessingOutput, ScriptProcessor
 from sagemaker.sklearn.processing import SKLearnProcessor
 from sagemaker.workflow.condition_step import ConditionStep
 from sagemaker.workflow.conditions import ConditionLessThanOrEqualTo
-from sagemaker.workflow.functions import JsonGet
+from sagemaker.workflow.functions import Join, JsonGet
 from sagemaker.workflow.parameters import ParameterInteger, ParameterString
 from sagemaker.workflow.pipeline import Pipeline
 from sagemaker.workflow.properties import PropertyFile
 from sagemaker.workflow.step_collections import RegisterModel
 from sagemaker.workflow.steps import ProcessingStep, TrainingStep
-from sagemaker.workflow.functions import Join
-from sagemaker.jumpstart.estimator import JumpStartEstimator
-
 
 BASE_DIR = Path(__file__).parent
 
@@ -68,7 +65,6 @@ def get_pipeline_custom_tags(new_tags: Any, region: str, sagemaker_project_arn: 
 
 def get_pipeline(
     region: str,
-    # sagemaker_project_arn: str | None = None,
     role: Union[str, None] = None,
     default_bucket: Union[str, None] = None,
     model_package_group_name: str = "PowerForecastPackageGroup",
@@ -90,6 +86,9 @@ def get_pipeline(
 
     Returns:
         Pipeline: SageMakerパイプラインオブジェクト
+
+    Nones:
+        sagemaker_project_arn: str | None = None が後で必要になる？
     """
     # 1. SageMakerセッションの作成
     sagemaker_session = get_session(region, default_bucket)

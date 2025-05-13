@@ -1,9 +1,9 @@
 .PHONY: lint format all
 
 lint:
-	poetry run ruff
+	poetry run ruff check
 
-format:
+fmt:
 	poetry run ruff check --fix
 
-all: lint format
+all: lint fmt

@@ -1,10 +1,11 @@
+import argparse
 import logging
 import os
-import zipfile
-import argparse
 import pathlib
-import pandas as pd
+import zipfile
 from typing import List
+
+import pandas as pd
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)

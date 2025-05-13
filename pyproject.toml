@@ -6,7 +6,7 @@ authors = [
     {name = "Ryo Watanabe",email = "ryopoaro03290024@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.6,<3.7"
+requires-python = ">=3.10"
 dependencies = [
     "polars (>=1.29.0,<2.0.0)",
     "pandas (>=2.2.3,<3.0.0)",
@@ -56,16 +56,22 @@ lint.ignore = [
     "UP006",
     "UP007",
     "ANN401",
+    "S202",
     "S301",
+    "S603",
+    "E402",
+    "UP035",
+    "T201",
+    "FBT001",
+    "FBT002",
+    "PLR2004",
+    "PLR0911",
+    "PLR0912",
+    "C901",
 ]
 target-version = "py311"
-
-[tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = [
-    "S101",
-    "ANN201",
-    "N802",
-    "ARG",
+exclude = [
+    "pipeline/model/mvp.ipynb",
 ]
 
 [tool.ruff.lint.pydocstyle]

@@ -1,25 +1,22 @@
 import subprocess
 import sys
-import os
 
 # 必要なパッケージをその場でインストール
 subprocess.run(
-    [sys.executable, "-m", "pip", "install", "--quiet", "holidays", "omegaconf", "category-encoders"], check=True
+    [sys.executable, "-m", "pip", "install", "--quiet", "holidays", "omegaconf", "category-encoders"],
+    check=True,
 )
 sys.path.append("/opt/ml/processing/deps")
+import argparse
 import logging
+from pathlib import Path
+from typing import Tuple, Union
 
 import holidays
 import numpy as np
 import pandas as pd
-from typing import Union, Tuple
-from pathlib import Path
-from omegaconf import DictConfig, OmegaConf
-
 from feature_encoder import FeatureEncoder
-import argparse
-import pathlib
-import json
+from omegaconf import DictConfig, OmegaConf
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -104,45 +101,41 @@ class FeatureEngineering:
             return "不明"
 
         # 雪系
-        elif any(keyword in weather for keyword in ["雪", "ゆき"]):
+        if any(keyword in weather for keyword in ["雪", "ゆき"]):
             return "雪"
 
         # 雷系
         if "雷" in weather:
             if any(keyword in weather for keyword in ["雨", "あめ"]):
                 return "雷雨"
-            elif any(keyword in weather for keyword in ["晴", "日射"]):
+            if any(keyword in weather for keyword in ["晴", "日射"]):
                 return "晴れ(雷あり)"
-            elif any(keyword in weather for keyword in ["曇", "くもり"]):
+            if any(keyword in weather for keyword in ["曇", "くもり"]):
                 return "曇り(雷あり)"
-            else:
-                return "雷"
+            return "雷"
 
         # 晴れ系
         if "快晴" in weather:
             return "快晴"
-        elif any(keyword in weather for keyword in ["晴", "日射"]):
+        if any(keyword in weather for keyword in ["晴", "日射"]):
             if any(keyword in weather for keyword in ["曇", "くもり"]):
                 return "晴れ時々曇り"
-            elif any(keyword in weather for keyword in ["雨", "あめ", "雷"]):
+            if any(keyword in weather for keyword in ["雨", "あめ", "雷"]):
                 return "晴れ時々雨"
-            else:
-                return "晴れ"
+            return "晴れ"
 
         # 曇り系
-        elif any(keyword in weather for keyword in ["曇", "くもり"]):
+        if any(keyword in weather for keyword in ["曇", "くもり"]):
             if any(keyword in weather for keyword in ["雨", "あめ"]):
                 return "曇り時々雨"
-            else:
-                return "曇り"
+            return "曇り"
 
         # 雨系
-        elif any(keyword in weather for keyword in ["雨", "あめ"]):
+        if any(keyword in weather for keyword in ["雨", "あめ"]):
             return "雨"
 
         # その他
-        else:
-            return "その他"
+        return "その他"
 
     def create_numeric_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """数値系特徴量を作成する
@@ -327,7 +320,7 @@ def save_column_names(df: pd.DataFrame, output_path: str = "/opt/ml/processing/t
     """
     feature_names = df.columns.tolist()
 
-    with open(output_path, "w") as f:
+    with Path(output_path).open("w") as f:
         for name in feature_names:
             f.write(f"{name}\n")
 

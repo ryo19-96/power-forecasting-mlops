@@ -5,18 +5,18 @@ import tarfile
 # 必要なパッケージをその場でインストール
 subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "lightgbm", "scikit-learn"], check=True)
 
-import json
-import os
-from pathlib import Path
-import joblib
-import logging
 import argparse
-import pandas as pd
-import numpy as np
-import lightgbm as lgb
-from sklearn.metrics import mean_squared_error
+import json
+import logging
+from pathlib import Path
 from typing import List, Tuple, Union
+
+import joblib
+import lightgbm as lgb
+import numpy as np
+import pandas as pd
 from scipy.sparse import spmatrix
+from sklearn.metrics import mean_squared_error
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -30,7 +30,7 @@ def load_model(model_tar_path: str) -> lgb.Booster:
     Returns:
         lgb.Booster: 学習済みモデル
     """
-    extract_dir = "/tmp/model"
+    extract_dir = "/tmp/model"  # noqa: S108
     Path(extract_dir).mkdir(exist_ok=True)
     with tarfile.open(model_tar_path, "r:gz") as tar:
         tar.extractall(path=extract_dir)
@@ -46,7 +46,7 @@ def get_feature_names(feature_name_path: str) -> List[str]:
     Returns:
         List[str]: 特徴量名のリスト
     """
-    with open(feature_name_path, "r") as f:
+    with Path(feature_name_path).open() as f:
         feature_names = [line.strip() for line in f if line.strip()]
     return feature_names
 
