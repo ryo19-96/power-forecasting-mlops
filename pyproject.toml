@@ -71,7 +71,7 @@ lint.ignore = [
 ]
 target-version = "py311"
 exclude = [
-    "pipeline/model/mvp.ipynb",
+    "pipeline/model/model_exploration.ipynb",
 ]
 
 [tool.ruff.lint.pydocstyle]
