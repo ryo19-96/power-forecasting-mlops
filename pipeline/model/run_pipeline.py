@@ -1,4 +1,3 @@
-
 from pipeline_aws import get_pipeline
 
 region = "ap-northeast-1"
@@ -14,10 +13,20 @@ pipeline = get_pipeline(
     environment="dev",
 )
 
-# 1. 定義をSageMakerに登録（なければ作成・あれば更新）
+# 定義をSageMakerに登録
 pipeline.upsert(role_arn=role)
 
-# 2. パラメータ（任意）を渡して実行
+# 実行
 execution = pipeline.start()
 print("Started pipeline execution:")
 print(f"Execution ARN: {execution.arn}")
+
+# actionsで完了を補足するために待機
+execution.wait()
+
+# 正常終了かチェック
+if execution.describe()["PipelineExecutionStatus"] != "Succeeded":
+    msg = "Pipeline execution failed."
+    raise RuntimeError(msg)
+else:
+    print("Pipeline execution succeeded.")
