@@ -100,3 +100,29 @@ resource "aws_iam_role_policy_attachment" "studio_attach_forecasting_policy" {
   role       = data.aws_iam_role.studio_execution.name
   policy_arn = aws_iam_policy.power_forecasting_policy.arn
 }
+
+resource "aws_iam_policy" "sagemaker_logs" {
+  name = "sagemaker-cloudwatch-logs"
+  path = "/service-role/"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogStreams"
+        ],
+        Resource = "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "attach_sagemaker_logs" {
+  role       = data.aws_iam_role.studio_execution.name
+  policy_arn = aws_iam_policy.sagemaker_logs.arn
+}
