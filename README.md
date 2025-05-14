@@ -1,4 +1,4 @@
-# power-forecasting-mlops
+# Power-Forecasting-MLOps
 
 ## 概要
 
@@ -87,7 +87,7 @@
 ---
 
 
-## 今後の展望
+## Next Steps
 
 ### 1. 推論APIの構築
 - SageMaker Serverless Inference による軽量のエンドポイント運用
