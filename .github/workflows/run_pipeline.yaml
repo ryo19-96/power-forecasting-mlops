@@ -1,0 +1,24 @@
+name: sagemaker-pipeline
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+concurrency: # 複数動いた場合古いワークフローを中断する
+  group: "run-pipeline"
+  cancel-in-progress: true
+jobs:
+  trigger:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: pip install poetry
+      - run: poetry install
+      - name: Start SageMaker pipeline
+        env:
+          AWS_DEFAULT_REGION: ap-northeast-1
+        run: poetry run pipeline/model/run_pipeline.py
