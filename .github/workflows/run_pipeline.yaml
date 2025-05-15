@@ -1,0 +1,41 @@
+name: sagemaker-pipeline
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "pipeline/**"
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - "pipeline/**"
+      - ".github/workflows/**"
+concurrency: # 複数動いた場合古いワークフローを中断する
+  group: "run-pipeline"
+  cancel-in-progress: true
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: pip install ruff
+      - run: ruff check .
+  trigger:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: pip install poetry
+      - run: poetry install  --no-root
+      - name: Start SageMaker pipeline
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ap-northeast-1
+        run: poetry run python pipeline/model/run_pipeline.py
