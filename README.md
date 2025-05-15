@@ -49,9 +49,9 @@ MLOpsの学習および実践を目的として、気象データと過去の電
 | `data/power_usage/`                 | 月別電力使用量データ         |
 | `pipeline/model/preprocess.py`      | データ前処理                 |
 | `pipeline/model/feature_encoder.py` | 特徴量エンジニアリング       |
-| `pipeline/model/model.py`           | モデル定義・学習             |
 | `pipeline/model/evaluate.py`        | モデル評価                   |
 | `pipeline/model/visualization.py`   | 結果可視化                   |
+| `pipeline/model/pipeline_aws.py`    | パイプライン定義             |
 | `pipeline/model/run_pipeline.py`    | 一連のパイプライン実行       |
 | `pipeline/model/output/`            | モデル・評価・可視化出力     |
 | `terraform/`                        | AWSリソース管理（S3, IAM等） |

@@ -22,9 +22,6 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
-HOT_DAY_THRESHOLD = 30
-COLD_DAY_THRESHOLD = 5
-
 
 def load_config(config_path: str) -> DictConfig:
     """設定ファイルを読み込む
@@ -63,6 +60,12 @@ class FeatureEngineering:
         self.config = config
         self.encoders_dict = {}
         self.jp_holidays = holidays.Japan()  # type: ignore[attr-defined]
+        # 閾値をconfigから取得
+        ft = self.config.get("feature_thresholds")
+        self.hot_day_threshold = ft.get("hot_day")
+        self.cold_day_threshold = ft.get("cold_day")
+        self.cdd_base = ft.get("cdd_base")
+        self.hdd_base = ft.get("hdd_base")
 
     def categorize_weather(self, weather_df: pd.DataFrame, weather_col: str = "weather") -> pd.DataFrame:
         """天気の文字列を基本的なカテゴリに分類する
@@ -154,17 +157,17 @@ class FeatureEngineering:
         # 気温の日較差（最高気温と最低気温の差）
         result_df["rng"] = df["max_temp"] - df["min_temp"]
 
-        # 冷房度日：平均気温が18℃を超えた分だけ冷房が必要と考える指標
-        result_df["cdd"] = (result_df["avg"] - 18).clip(lower=0)
+        # 冷房度日：平均気温がcdd_baseを超えた分だけ冷房が必要と考える指標
+        result_df["cdd"] = (result_df["avg"] - self.cdd_base).clip(lower=0)
 
-        # 暖房度日：平均気温が18℃未満の場合、暖房が必要と考える指標
-        result_df["hdd"] = (18 - result_df["avg"]).clip(lower=0)
+        # 暖房度日：平均気温がhdd_base未満の場合、暖房が必要と考える指標
+        result_df["hdd"] = (self.hdd_base - result_df["avg"]).clip(lower=0)
 
-        # 猛暑日フラグ（最高気温が30℃以上か）
-        result_df["hot"] = (df["max_temp"] >= HOT_DAY_THRESHOLD).astype(int)
+        # 猛暑日フラグ（最高気温がhot_day_threshold以上か）
+        result_df["hot"] = (df["max_temp"] >= self.hot_day_threshold).astype(int)
 
-        # 冬日フラグ（最低気温が5℃以下か）
-        result_df["cold"] = (df["min_temp"] <= COLD_DAY_THRESHOLD).astype(int)
+        # 冬日フラグ（最低気温がcold_day_threshold以下か）
+        result_df["cold"] = (df["min_temp"] <= self.cold_day_threshold).astype(int)
 
         return result_df
 
