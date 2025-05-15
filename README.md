@@ -5,13 +5,13 @@
 MLOpsの学習および実践を目的として、気象データと過去の電力使用実績を用いた機械学習モデルによる電力需要予測パイプラインを構築しました。
 前処理、学習、評価、可視化、モデル登録といった一連のプロセスを AWS SageMaker Pipeline 上に構築し、データ・成果物の保存には S3、インフラの構成管理には Terraform を用いて、クラウドネイティブな MLOps 運用を一貫して自動化・管理しています。
 
----
 
 ## アーキテクチャ
 
 ![パイプラインimage](images/architecture_diagram.svg)
 
---- 
+
+
 ## パイプライン詳細
 
 ![パイプラインimage](images/pipeline_image.png)
@@ -26,7 +26,7 @@ MLOpsの学習および実践を目的として、気象データと過去の電
 | `CheckMSEPowerForecastEvaluation`          | モデル性能の確認                   |
 | `RegisterPowerForecastModel-RegisterModel` | モデルの登録                       |
 
----
+
 
 ## ディレクトリ構成
 
@@ -39,7 +39,7 @@ MLOpsの学習および実践を目的として、気象データと過去の電
 | `pyproject.toml`      | Pythonプロジェクト管理（Poetry） |
 | `makefile`            | 各種コマンド自動化（ruff）       |
 
----
+
 
 ## 主要ファイル・機能
 
@@ -56,7 +56,7 @@ MLOpsの学習および実践を目的として、気象データと過去の電
 | `pipeline/model/output/`            | モデル・評価・可視化出力     |
 | `terraform/`                        | AWSリソース管理（S3, IAM等） |
 
----
+
 
 
 
@@ -79,7 +79,7 @@ MLOpsの学習および実践を目的として、気象データと過去の電
    terraform apply
    ```
 
----
+
 
 ## 出力例
 
