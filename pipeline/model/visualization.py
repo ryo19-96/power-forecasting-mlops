@@ -1,7 +1,7 @@
 import subprocess
 import sys
 
-# 必要なパッケージをその場でインストール（1回目だけ多少遅い）
+# 必要なパッケージをその場でインストール
 subprocess.run(
     [
         sys.executable,

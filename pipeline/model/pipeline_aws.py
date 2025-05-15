@@ -5,6 +5,7 @@ import boto3
 import sagemaker
 import sagemaker.session
 from botocore.client import BaseClient
+from omegaconf import OmegaConf
 from sagemaker import hyperparameters
 from sagemaker.inputs import TrainingInput
 from sagemaker.jumpstart.estimator import JumpStartEstimator
@@ -21,6 +22,9 @@ from sagemaker.workflow.step_collections import RegisterModel
 from sagemaker.workflow.steps import ProcessingStep, TrainingStep
 
 BASE_DIR = Path(__file__).parent
+CONFIG_PATH = BASE_DIR / "config.yaml"
+config = OmegaConf.load(CONFIG_PATH)
+pipeline_config = config.get("pipeline", {})
 
 
 def get_sagemaker_client(region: str) -> BaseClient:
@@ -96,19 +100,28 @@ def get_pipeline(
     # 2. 入力データの設定
     weather_input_data = ParameterString(
         name="InputDataUrl",
-        default_value=f"s3://power-forecasting-mlops-{environment}/data/weather_data.csv",
+        default_value=pipeline_config.get(
+            "weather_data_s3",
+            f"s3://power-forecasting-mlops-{environment}/data/weather_data.csv",
+        ),
     )
     power_usage_input_data = ParameterString(
         name="PowerUsageInputDataUrl",
-        default_value=f"s3://power-forecasting-mlops-{environment}/data/power_usage/",
+        default_value=pipeline_config.get(
+            "power_usage_s3",
+            f"s3://power-forecasting-mlops-{environment}/data/power_usage/",
+        ),
     )
 
     # 3. 処理ステップの設定
     # load and processing step for feature engineering
-    processing_instance_count = ParameterInteger(name="ProcessingInstanceCount", default_value=1)
+    processing_instance_count = ParameterInteger(
+        name="ProcessingInstanceCount",
+        default_value=pipeline_config.get("processing_instance_count", 1),
+    )
     processing_instance_type = ParameterString(
         name="ProcessingInstanceType",
-        default_value="ml.t3.medium",
+        default_value=pipeline_config.get("processing_instance_type", "ml.t3.medium"),
     )
 
     # データをロードして結合するステップ
@@ -187,8 +200,14 @@ def get_pipeline(
     )
 
     # training step for generating model artifacts
-    training_instance_type = ParameterString(name="TrainingInstanceType", default_value="ml.m5.large")
-    training_instance_count = ParameterInteger(name="TrainingInstanceCount", default_value=1)
+    training_instance_type = ParameterString(
+        name="TrainingInstanceType",
+        default_value=pipeline_config.get("training_instance_type", "ml.m5.large"),
+    )
+    training_instance_count = ParameterInteger(
+        name="TrainingInstanceCount",
+        default_value=pipeline_config.get("training_instance_count", 1),
+    )
 
     model_path = f"s3://{sagemaker_session.default_bucket()}/{base_job_prefix}/Train"
     train_model_id, train_model_version = "lightgbm-regression-model", "*"
@@ -351,14 +370,13 @@ def get_pipeline(
     )
 
     # モデル品質を評価し、分岐実行を行う条件ステップ
-    # TODO: configファイルから取得するように変更する
     cond_lte = ConditionLessThanOrEqualTo(
         left=JsonGet(
             step_name=step_evaluate.name,
             property_file=evaluation_report,
             json_path="regression_metrics.mse.value",
         ),
-        right=999999.0,
+        right=pipeline_config.get("mse_threshold", 10000.0),
     )
 
     step_cond = ConditionStep(

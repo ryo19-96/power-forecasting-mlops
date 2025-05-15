@@ -1,4 +1,27 @@
+run:
+  region: ap-northeast-1
+  role: arn:aws:iam::163817410757:role/service-role/AmazonSageMaker-ExecutionRole-20250507T172311
+  default_bucket: power-forecasting-mlops-dev
+  pipeline_name: PowerForecastPipeline
+  environment: dev
+
+pipeline:
+  weather_data_s3: s3://power-forecasting-mlops-dev/data/weather_data.csv
+  power_usage_s3: s3://power-forecasting-mlops-dev/data/power_usage/
+  processing_instance_type: ml.t3.medium
+  processing_instance_count: 1
+  training_instance_type: ml.m5.large
+  training_instance_count: 1
+  mse_threshold: 999999.0
+
 encoders:
   - name: One-Hot
     columns:
       - weather_category
+
+feature_thresholds:
+  hot_day: 30
+  cold_day: 5
+  cdd_base: 18
+  hdd_base: 18
+
