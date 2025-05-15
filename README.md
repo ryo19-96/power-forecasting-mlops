@@ -2,12 +2,17 @@
 
 ## 概要
 
-本プロジェクトはMLOps学習用として、気象データと過去の電力使用量データを用いての機械学習による電力需要予測を行うMLOpsパイプラインの構築・運用を目的としています。  
-データはS3に保存してあり、前処理からモデル学習・評価・可視化、AWS上でのパイプライン運用、インフラ管理（Terraform）までを一貫して管理します。
+MLOpsの学習および実践を目的として、気象データと過去の電力使用実績を用いた機械学習モデルによる電力需要予測パイプラインを構築しました。
+前処理、学習、評価、可視化、モデル登録といった一連のプロセスを AWS SageMaker Pipeline 上に構築し、データ・成果物の保存には S3、インフラの構成管理には Terraform を用いて、クラウドネイティブな MLOps 運用を一貫して自動化・管理しています。
 
----
 
-## パイプライン全体像
+## アーキテクチャ
+
+![パイプラインimage](images/architecture_diagram.svg)
+
+
+
+## パイプライン詳細
 
 ![パイプラインimage](images/pipeline_image.png)
 
@@ -21,7 +26,7 @@
 | `CheckMSEPowerForecastEvaluation`          | モデル性能の確認                   |
 | `RegisterPowerForecastModel-RegisterModel` | モデルの登録                       |
 
----
+
 
 ## ディレクトリ構成
 
@@ -34,7 +39,7 @@
 | `pyproject.toml`      | Pythonプロジェクト管理（Poetry） |
 | `makefile`            | 各種コマンド自動化（ruff）       |
 
----
+
 
 ## 主要ファイル・機能
 
@@ -51,7 +56,7 @@
 | `pipeline/model/output/`            | モデル・評価・可視化出力     |
 | `terraform/`                        | AWSリソース管理（S3, IAM等） |
 
----
+
 
 
 
@@ -74,7 +79,7 @@
    terraform apply
    ```
 
----
+
 
 ## 出力例
 
@@ -93,8 +98,7 @@
 - SageMaker Serverless Inference による軽量のエンドポイント運用
 - API を通じて外部サービスから予測値を取得可能にする
 
-### 2. モデルの自動デプロイの実装（CI/CD）
-- GitHub Actions により、mainブランチへのマージをトリガーにパイプラインを実行
+### 2. モデルの自動デプロイの実装（CD）
 - パイプライン完了後、モデルが "Approved" 状態であることを確認 → APIエンドポイントとして自動デプロイ
 
 ### 3.  監視・通知機能の追加
