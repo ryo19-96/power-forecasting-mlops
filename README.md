@@ -8,7 +8,7 @@ MLOpsの学習および実践を目的として、気象データと過去の電
 
 ## アーキテクチャ
 
-![パイプラインimage](images/architecture_diagram.svg)
+![パイプラインimage](images/architecture_diagram.png)
 
 
 
