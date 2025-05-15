@@ -61,11 +61,11 @@ class FeatureEngineering:
         self.encoders_dict = {}
         self.jp_holidays = holidays.Japan()  # type: ignore[attr-defined]
         # 閾値をconfigから取得
-        ft = self.config.get("feature_thresholds")
-        self.hot_day_threshold = ft.get("hot_day")
-        self.cold_day_threshold = ft.get("cold_day")
-        self.cdd_base = ft.get("cdd_base")
-        self.hdd_base = ft.get("hdd_base")
+        thresholds = self.config.get("feature_thresholds")
+        self.hot_day_threshold = thresholds.get("hot_day")
+        self.cold_day_threshold = thresholds.get("cold_day")
+        self.cdd_base = thresholds.get("cdd_base")
+        self.hdd_base = thresholds.get("hdd_base")
 
     def categorize_weather(self, weather_df: pd.DataFrame, weather_col: str = "weather") -> pd.DataFrame:
         """天気の文字列を基本的なカテゴリに分類する
