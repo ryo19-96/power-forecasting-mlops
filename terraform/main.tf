@@ -18,3 +18,15 @@ module "s3" {
 module "iam" {
   source = "./modules/iam"
 }
+
+module "api_gateway" {
+  source = "./modules/api_gateway"
+}
+
+module "lambda" {
+  source = "./modules/lambda"
+}
+
+module "eventbridge" {
+  source = "./modules/eventbridge"
+}
