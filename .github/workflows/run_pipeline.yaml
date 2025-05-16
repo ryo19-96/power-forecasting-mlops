@@ -23,7 +23,7 @@ jobs:
           python-version: "3.10"
       - run: pip install ruff
       - run: ruff check .
-  trigger:
+  model-pipeline-check:
     needs: lint
     runs-on: ubuntu-latest
     steps:
