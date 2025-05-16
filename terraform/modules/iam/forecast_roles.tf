@@ -75,6 +75,17 @@ resource "aws_iam_policy" "power_forecasting_policy" {
           "sagemaker:*"
         ],
         Resource = "*"
+      },
+      {
+        Effect = "Allow",
+        Action = [
+          "s3:GetObject",
+          "s3:ListBucket"
+        ],
+        Resource = [
+          "arn:aws:s3:::jumpstart-cache-prod-ap-northeast-1",
+          "arn:aws:s3:::jumpstart-cache-prod-ap-northeast-1/*"
+        ]
       }
     ]
   })
