@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -36,12 +37,13 @@ execution = pipeline.start(
 print("Started pipeline execution:")
 print(f"Execution ARN: {execution.arn}")
 
-# actionsで完了を補足するために待機
-execution.wait()
-
-# 正常終了かチェック
-if execution.describe()["PipelineExecutionStatus"] != "Succeeded":
-    msg = "Pipeline execution failed."
-    raise RuntimeError(msg)
-else:
-    print("Pipeline execution succeeded.")
+# actionsで完了を補足するために待機（GitHub Actions 環境でだけwaitさせる）
+if os.getenv("CI") == "true":
+    execution.wait()
+    # 正常終了かチェック
+    status = execution.describe()["PipelineExecutionStatus"]
+    if status != "Succeeded":
+        msg = f"Pipeline execution failed: {status}"
+        raise RuntimeError(msg)
+    else:
+        print("Pipeline execution succeeded.")

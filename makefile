@@ -6,4 +6,4 @@ lint:
 fmt:
 	poetry run ruff check --fix
 
-all: lint fmt
+all: fmt lint
