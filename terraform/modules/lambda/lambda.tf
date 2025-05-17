@@ -5,8 +5,8 @@ variable "lambda_email_role_arn" {
 
 resource "aws_lambda_function" "send_approval_email" {
   function_name    = "send-approval-email-${terraform.workspace}"
-  filename         = "../send_approval_email.zip"
-  source_code_hash = filebase64sha256("../send_approval_email.zip")
+  filename         = "../lambda/send_approval_email.zip"
+  source_code_hash = filebase64sha256("../lambda/send_approval_email.zip")
   runtime          = "python3.10"
   role             = var.lambda_email_role_arn
   handler          = "send_approval_email.lambda_handler" # Lambda関数のエントリポイント
