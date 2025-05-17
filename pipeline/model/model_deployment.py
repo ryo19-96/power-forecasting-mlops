@@ -1,10 +1,9 @@
+import time
+
+import boto3
+from pipeline_aws import get_session
 from sagemaker.model import ModelPackage
 from sagemaker.serverless.serverless_inference_config import ServerlessInferenceConfig
-import sagemaker
-import boto3
-import time
-from pipeline_aws import get_session
-
 
 region = "ap-northeast-1"
 role = "arn:aws:iam::163817410757:role/service-role/AmazonSageMaker-ExecutionRole-20250507T172311"

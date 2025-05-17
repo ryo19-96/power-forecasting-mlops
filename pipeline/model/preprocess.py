@@ -9,10 +9,9 @@ subprocess.run(
 sys.path.append("/opt/ml/processing/deps")
 import argparse
 import logging
-from pathlib import Path
 import pickle
-import joblib
-from typing import Tuple, Union, Dict
+from pathlib import Path
+from typing import Dict, Tuple, Union
 
 import holidays
 import numpy as np
@@ -224,8 +223,8 @@ class FeatureEngineering:
         Returns:
             pd.DataFrame: エンコードされたデータフレーム
         """
-        if reset_encoders:
-            encoders_dict = {}
+        # encoders_dictを必ず初期化
+        encoders_dict = {} if reset_encoders else getattr(self, "_encoders_dict", {})
 
         result_df = df.copy()
 
@@ -239,6 +238,8 @@ class FeatureEngineering:
                     encoder = encoders_dict[params["name"]]
                     result_df = encoder.transform(result_df)
 
+        # selfに保存しておく（再利用用）
+        self._encoders_dict = encoders_dict
         return result_df, encoders_dict
 
     def make_features(self, df: pd.DataFrame, date_col: str = "date") -> Tuple[pd.DataFrame, Dict[str, FeatureEncoder]]:
@@ -262,6 +263,8 @@ class FeatureEngineering:
         # configでエンコーダーの指定があればエンコーダーを適用
         if self.config and "encoders" in self.config:
             df, encoders_dict = self.encode_features(df, self.config)
+        else:
+            encoders_dict = {}
 
         return df, encoders_dict
 

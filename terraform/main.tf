@@ -6,7 +6,7 @@ terraform {
     }
   }
 }
-
+# TODO: version 固定
 provider "aws" {
   region = "ap-northeast-1"
 }
@@ -19,14 +19,17 @@ module "iam" {
   source = "./modules/iam"
 }
 
-module "api_gateway" {
-  source = "./modules/api_gateway"
+module "lambda" {
+  source                 = "./modules/lambda"
+  lambda_email_role_arn  = module.iam.lambda_email_role.arn
+  approval_email_address = var.approval_email_address
 }
 
-module "lambda" {
-  source = "./modules/lambda"
-}
+# module "api_gateway" {
+#   source = "./modules/api_gateway"
+# }
 
 module "eventbridge" {
-  source = "./modules/eventbridge"
+  source              = "./modules/eventbridge"
+  aws_lambda_function = module.lambda.send_approval_email_lambda
 }

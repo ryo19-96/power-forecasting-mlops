@@ -1,3 +1,4 @@
+# sagemaker の使用ロール
 resource "aws_iam_role" "power_forecasting_role" {
   assume_role_policy = jsonencode(
     {
@@ -15,10 +16,8 @@ resource "aws_iam_role" "power_forecasting_role" {
       ]
     }
   )
-  force_detach_policies = false
-  max_session_duration  = 3600
-  name                  = "power-forecasting-role-${terraform.workspace}"
-  path                  = "/service-role/"
+  name = "power-forecasting-role-${terraform.workspace}"
+  path = "/service-role/"
   tags = {
     Environment = terraform.workspace
     Project     = "PowerForecasting"
@@ -116,7 +115,7 @@ resource "aws_iam_policy" "sagemaker_logs" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "attach_sagemaker_logs" {
-  role       = data.aws_iam_role.studio_execution.name
+resource "aws_iam_role_policy_attachment" "sagemaker_logs" {
+  role       = aws_iam_role.power_forecasting_role.name
   policy_arn = aws_iam_policy.sagemaker_logs.arn
 }
