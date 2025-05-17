@@ -14,9 +14,9 @@ model_pkg_response = sm.create_model_package(
     InferenceSpecification={
         "Containers": [
             {
-                "Image": "763104351884.dkr.ecr.ap-northeast-1.amazonaws.com/tensorflow-inference-graviton:2.9.1-cpu-py38",
+                "Image": "763104351884.dkr.ecr.ap-northeast-1.amazonaws.com/tensorflow-inference-graviton:2.9.1-cpu-py38",  # noqa: E501
                 "ModelDataUrl": "s3://power-forecasting-mlops-dev/test/model.tar.gz",
-            }
+            },
         ],
         "SupportedContentTypes": ["text/csv"],
         "SupportedResponseMIMETypes": ["text/csv"],
