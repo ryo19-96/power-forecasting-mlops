@@ -1,6 +1,8 @@
 import argparse
 import logging
 import os
+import shutil
+from pathlib import Path
 from typing import Any, Dict, Tuple
 
 import joblib
@@ -23,9 +25,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--model-dir", type=str, default=os.environ.get("SM_MODEL_DIR"))
-    parser.add_argument("--train", type=str, default=os.environ.get("SM_CHANNEL_TRAIN"))
+    parser.add_argument("--train", type=str)
 
-    # トレーニングパラメータ
+    # パラメータ
     parser.add_argument("--n_estimators", type=int, default=500)
     parser.add_argument("--learning_rate", type=float, default=0.1)
     parser.add_argument("--max_depth", type=int, default=-1)
@@ -86,20 +88,29 @@ def train(X: np.ndarray, y: np.ndarray, hyperparameters: Dict[str, Any]) -> LGBM
     return model
 
 
-def save_model(model: LGBMRegressor, model_dir: str) -> None:
-    """モデルを保存する
+def save_model(model: LGBMRegressor, model_dir: str, train_dir: str) -> None:
+    """
+    モデルを保存する
 
     Args:
         model (LGBMRegressor): 保存するモデル
         model_dir (str): モデルの保存先ディレクトリ
+        train_dir (str): train.csvが入っているディレクトリ
     """
-    logger.info(f"Saving model to {model_dir}")
 
     # モデルを保存
     model_path = os.path.join(model_dir, "model.joblib")
     joblib.dump(model, model_path)
 
-    logger.info("Model saved success")
+    # train.csvが保存されているディレクトリにあるencoders.pklとreatures.txtをコピー
+    encoders_path = os.path.join(train_dir, "encoders.pkl")
+    features_path = os.path.join(train_dir, "features.txt")
+    if Path(encoders_path).exists():
+        shutil.copy(encoders_path, os.path.join(model_dir, "encoders.pkl"))
+    if Path(features_path).exists():
+        shutil.copy(features_path, os.path.join(model_dir, "features.txt"))
+
+    logger.info("Model and related files saved successfully")
 
 
 if __name__ == "__main__":
@@ -120,4 +131,4 @@ if __name__ == "__main__":
     model = train(X_train, y_train, hyperparameters)
 
     # モデルの保存
-    save_model(model, args.model_dir)
+    save_model(model, args.model_dir, args.train)

@@ -27,16 +27,16 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, str]:
     logger.info("event =", event)
     logger.info("context =", vars(context))
     # どの ModelPackage が approved になったかを取得
-    pkg_arn = event["detail"]["ModelPackageArn"]
+    model_package_arn = event["detail"]["ModelPackageArn"]
 
-    # (オプション) ApprovedモデルをParameterStoreに保存
-    ssm_client.put_parameter(Name="/mlops/pf/dev/approved", Value=pkg_arn, Type="String", Overwrite=True)
+    # ApprovedモデルをParameterStoreに保存
+    ssm_client.put_parameter(Name="/mlops/pf/dev/approved", Value=model_package_arn, Type="String", Overwrite=True)
 
     # パイプラインを起動
     sagemaker_client.start_pipeline_execution(
         PipelineName=os.environ["PIPELINE_NAME"],
         RoleArn=os.environ["PIPELINE_ROLE_ARN"],
-        PipelineParameters=[{"Name": "ModelPackageArn", "Value": pkg_arn}],
+        PipelineParameters=[{"Name": "ModelPackageArn", "Value": model_package_arn}],
     )
 
-    return {"status": "started", "model_package": pkg_arn}
+    return {"status": "started", "model_package": model_package_arn}
