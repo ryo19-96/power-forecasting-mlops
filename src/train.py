@@ -7,9 +7,6 @@ from typing import Any, Dict, Tuple
 
 import joblib
 
-# 必要なパッケージをその場でインストール
-subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "lightgbm"], check=True)
-
 import numpy as np
 import pandas as pd
 from lightgbm import LGBMRegressor
