@@ -32,8 +32,12 @@ resource "aws_lambda_function" "send_approval_email" {
 }
 
 output "send_approval_email_lambda" {
-  value = aws_lambda_function.send_approval_email
+  value = {
+    arn           = aws_lambda_function.send_approval_email.arn
+    function_name = aws_lambda_function.send_approval_email.function_name
+  }
 }
+
 
 # emailでの承認後用 lambda 関数定義
 variable "lambda_update_package_role_arn" {

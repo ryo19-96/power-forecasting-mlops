@@ -221,7 +221,7 @@ class FeatureEngineering:
             reset_encoders: エンコーダーを初期化するかどうか
 
         Returns:
-            pd.DataFrame: エンコードされたデータフレーム
+            Tuple[pd.DataFrame, Dict[str, FeatureEncoder]]: エンコードされたデータフレームとエンコーダーの辞書
         """
         # encoders_dictを必ず初期化
         encoders_dict = {} if reset_encoders else getattr(self, "_encoders_dict", {})

@@ -5,6 +5,11 @@ from typing import Any, Dict
 
 import boto3
 
+import logging
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
 ses = boto3.client("ses")
 
 
@@ -14,10 +19,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> None:
         event (Dict[str, Any]): イベントトリガー情報
         context (Any): 実行コンテキスト情報（関数名やメモリなど）
     """
-    print("=== Lambda Triggered ===")
-    print("Event detail:", event.get("detail", {}))
-    print("event =", event)
-    print("context =", vars(context))
+    logger.info("=== Lambda Triggered ===")
+    logger.info("Event detail:", event.get("detail", {}))
+    logger.info("event =", event)
+    logger.info("context =", vars(context))
     approver_email = os.environ["APPROVER_EMAIL"]
     api_url = os.environ["API_URL"]
 

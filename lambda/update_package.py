@@ -4,6 +4,11 @@ from typing import Any, Dict
 
 import boto3
 
+import logging
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
 sagemaker_client = boto3.client("sagemaker")
 
 
@@ -18,10 +23,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: レスポンス情報
     """
-    print("=== Lambda Triggered ===")
-    print("Event detail:", event.get("detail", {}))
-    print("event =", event)
-    print("context =", vars(context))
+    logger.info("=== Lambda Triggered ===")
+    logger.info("Event detail:", event.get("detail", {}))
+    logger.info("event =", event)
+    logger.info("context =", vars(context))
 
     action = event["queryStringParameters"]["action"]
     model_package_arn = urllib.parse.unquote(event["queryStringParameters"]["pkg"])
