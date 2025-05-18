@@ -115,3 +115,6 @@ MLOpsの学習および実践を目的として、気象データと過去の電
 - 特徴量管理の一元化
 
 ---
+
+参考
+- Actions, resources, and condition keys for AWS services(https://docs.aws.amazon.com/service-authorization/latest/reference/reference_policies_actions-resources-contextkeys.html)

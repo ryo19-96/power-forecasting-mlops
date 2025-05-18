@@ -9,8 +9,9 @@ subprocess.run(
 sys.path.append("/opt/ml/processing/deps")
 import argparse
 import logging
+import pickle
 from pathlib import Path
-from typing import Tuple, Union
+from typing import Dict, Tuple, Union
 
 import holidays
 import numpy as np
@@ -58,7 +59,6 @@ class FeatureEngineering:
             config: 設定情報（省略可能）
         """
         self.config = config
-        self.encoders_dict = {}
         self.jp_holidays = holidays.Japan()  # type: ignore[attr-defined]
         # 閾値をconfigから取得
         thresholds = self.config.get("feature_thresholds")
@@ -207,7 +207,12 @@ class FeatureEngineering:
 
         return result_df
 
-    def encode_features(self, df: pd.DataFrame, config: DictConfig, reset_encoders: bool = False) -> pd.DataFrame:
+    def encode_features(
+        self,
+        df: pd.DataFrame,
+        config: DictConfig,
+        reset_encoders: bool = False,
+    ) -> Tuple[pd.DataFrame, Dict[str, FeatureEncoder]]:
         """特徴量をエンコードする
 
         Args:
@@ -216,26 +221,28 @@ class FeatureEngineering:
             reset_encoders: エンコーダーを初期化するかどうか
 
         Returns:
-            pd.DataFrame: エンコードされたデータフレーム
+            Tuple[pd.DataFrame, Dict[str, FeatureEncoder]]: エンコードされたデータフレームとエンコーダーの辞書
         """
-        if reset_encoders:
-            self.encoders_dict = {}
+        # encoders_dictを必ず初期化
+        encoders_dict = {} if reset_encoders else getattr(self, "_encoders_dict", {})
 
         result_df = df.copy()
 
         if "encoders" in config:
             for params in config["encoders"]:
-                if params["name"] not in self.encoders_dict:
+                if params["name"] not in encoders_dict:
                     encoder = FeatureEncoder(**params)
                     result_df = encoder.fit_transform(result_df)
-                    self.encoders_dict[params["name"]] = encoder
+                    encoders_dict[params["name"]] = encoder
                 else:
-                    encoder = self.encoders_dict[params["name"]]
+                    encoder = encoders_dict[params["name"]]
                     result_df = encoder.transform(result_df)
 
-        return result_df
+        # selfに保存しておく（再利用用）
+        self._encoders_dict = encoders_dict
+        return result_df, encoders_dict
 
-    def make_features(self, df: pd.DataFrame, date_col: str = "date") -> pd.DataFrame:
+    def make_features(self, df: pd.DataFrame, date_col: str = "date") -> Tuple[pd.DataFrame, Dict[str, FeatureEncoder]]:
         """データフレーム全体に対して特徴量を作成する
 
         Args:
@@ -255,9 +262,11 @@ class FeatureEngineering:
 
         # configでエンコーダーの指定があればエンコーダーを適用
         if self.config and "encoders" in self.config:
-            df = self.encode_features(df, self.config)
+            df, encoders_dict = self.encode_features(df, self.config)
+        else:
+            encoders_dict = {}
 
-        return df
+        return df, encoders_dict
 
 
 def format_target_first(df: pd.DataFrame, target_col: str = "max_power") -> pd.DataFrame:
@@ -328,6 +337,23 @@ def save_column_names(df: pd.DataFrame, output_path: str = "/opt/ml/processing/t
             f.write(f"{name}\n")
 
 
+def save_encoders(
+    encoders_dict: Dict[str, FeatureEncoder],
+    file_dir: Path,
+    filename: str,
+) -> None:
+    """
+    エンコーダを保存する関数
+
+    Args:
+        encoders_dict(Dict[str, FeatureEncoder]): エンコーダの辞書
+        file_dir(Path): 保存先のディレクトリ
+        file_name(str): 保存ファイル名
+    """
+    with Path(file_dir / filename).open("wb") as f:
+        pickle.dump(encoders_dict, f)
+
+
 if __name__ == "__main__":
     logger.info("Starting processing data...")
     parser = argparse.ArgumentParser()
@@ -340,7 +366,7 @@ if __name__ == "__main__":
     data = load_data(input_path)
     feature_engineering = FeatureEngineering(config=config)
     # データの前処理
-    processed_data = feature_engineering.make_features(data)
+    processed_data, encoders_dict = feature_engineering.make_features(data)
     train_data, test_data = train_test_split(processed_data, test_date="2024-10-01")
     # カラム名を保存
     save_column_names(train_data, output_path=f"{base_dir}/train/features.txt")
@@ -348,6 +374,11 @@ if __name__ == "__main__":
     # データの保存
     Path(f"{base_dir}/train").mkdir(parents=True, exist_ok=True)
     train_data.to_csv(f"{base_dir}/train/train.csv", index=False, header=False)
+    save_encoders(
+        encoders_dict,
+        file_dir=Path(f"{base_dir}/train"),
+        filename="encoders.pkl",
+    )
     Path(f"{base_dir}/test").mkdir(parents=True, exist_ok=True)
     test_data.to_csv(f"{base_dir}/test/test.csv", index=False, header=False)
     logger.info("Finished processing data...")
