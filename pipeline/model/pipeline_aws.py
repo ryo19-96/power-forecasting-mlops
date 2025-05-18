@@ -365,7 +365,7 @@ def get_pipeline(
         inference_instances=["ml.m5.large"],
         transform_instances=["ml.m5.large"],
         model_package_group_name=model_package_group_name,
-        approval_status="Approved",
+        approval_status="PendingManualApproval",
         model_metrics=model_metrics,
     )
 
