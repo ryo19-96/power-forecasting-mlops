@@ -1,11 +1,11 @@
 import argparse
 import logging
 import os
-import pickle
-from typing import Dict, Any, Tuple
-import joblib
 import subprocess
 import sys
+from typing import Any, Dict, Tuple
+
+import joblib
 
 # 必要なパッケージをその場でインストール
 subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "lightgbm"], check=True)
@@ -13,7 +13,6 @@ subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "lightgbm"], 
 import numpy as np
 import pandas as pd
 from lightgbm import LGBMRegressor
-
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)

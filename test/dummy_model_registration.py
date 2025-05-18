@@ -1,3 +1,4 @@
+# noqa: INP001
 """
 model registryにダミーモデルを"PendingManualApproval"で登録するスクリプト
 model pipelineを動作させなくてもその後の承認フロー確認用

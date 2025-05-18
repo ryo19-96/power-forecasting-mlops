@@ -1,8 +1,9 @@
 # noqa: INP001
 import logging
-import boto3
-from typing import Any, Dict
 import os
+from typing import Any, Dict
+
+import boto3
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -21,6 +22,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, str]:
     Returns:
         Dict[str, str]: レスポンス情報
     """
+    logger.info("=== Lambda Triggered ===")
+    logger.info("Event detail:", event.get("detail", {}))
+    logger.info("event =", event)
+    logger.info("context =", vars(context))
     # どの ModelPackage が approved になったかを取得
     pkg_arn = event["detail"]["ModelPackageArn"]
 

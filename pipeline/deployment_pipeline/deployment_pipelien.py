@@ -1,7 +1,7 @@
 import time
+from typing import Union
 
 import boto3
-from typing import Union
 import sagemaker
 from sagemaker.model import ModelPackage
 from sagemaker.serverless.serverless_inference_config import ServerlessInferenceConfig

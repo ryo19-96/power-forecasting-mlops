@@ -7,9 +7,10 @@ import sagemaker.session
 from botocore.client import BaseClient
 from omegaconf import OmegaConf
 from sagemaker.inputs import TrainingInput
-from sagemaker.sklearn.estimator import SKLearn
 from sagemaker.model_metrics import MetricsSource, ModelMetrics
 from sagemaker.processing import ProcessingInput, ProcessingOutput, ScriptProcessor
+from sagemaker.sklearn.estimator import SKLearn
+from sagemaker.sklearn.model import SKLearnModel
 from sagemaker.sklearn.processing import SKLearnProcessor
 from sagemaker.workflow.condition_step import ConditionStep
 from sagemaker.workflow.conditions import ConditionLessThanOrEqualTo
@@ -19,8 +20,6 @@ from sagemaker.workflow.pipeline import Pipeline
 from sagemaker.workflow.properties import PropertyFile
 from sagemaker.workflow.step_collections import RegisterModel
 from sagemaker.workflow.steps import ProcessingStep, TrainingStep
-from sagemaker.model import Model
-from sagemaker.sklearn.model import SKLearnModel
 
 # srcディレクトリのパスを取得
 BASE_DIR = Path(__file__).parent.parent.parent / "src"

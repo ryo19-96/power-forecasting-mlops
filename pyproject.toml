@@ -69,10 +69,11 @@ lint.ignore = [
     "PLR0912",
     "C901",
     "PLE1205",
+    "PD011",
 ]
 target-version = "py311"
 exclude = [
-    "pipeline/model/model_exploration.ipynb",
+    "src/model_exploration.ipynb",
 ]
 
 [tool.ruff.lint.pydocstyle]

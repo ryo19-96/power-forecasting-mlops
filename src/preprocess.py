@@ -16,8 +16,9 @@ from typing import Dict, Tuple, Union
 import holidays
 import numpy as np
 import pandas as pd
-from feature_encoder import FeatureEncoder
 from omegaconf import DictConfig, OmegaConf
+
+from feature_encoder import FeatureEncoder
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)

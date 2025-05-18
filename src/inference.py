@@ -6,12 +6,11 @@ https://docs.aws.amazon.com/ja_jp/sagemaker/latest/dg/neo-deployment-hosting-ser
 import json
 import logging
 import os
-import pickle
-from typing import Any, List, Dict, Union
+from typing import Any, Union
 
+import joblib
 import numpy as np
 import pandas as pd
-import joblib
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -52,7 +51,7 @@ def input_fn(request_body: Union[str, bytes], request_content_type: str) -> np.n
         # CSVデータをnumpy配列に変換
         df = pd.read_csv(pd.io.common.StringIO(request_body))
         return df.values
-    elif request_content_type == "application/json":
+    if request_content_type == "application/json":
         # JSONデータをnumpy配列に変換
         data = json.loads(request_body)
 
@@ -65,8 +64,8 @@ def input_fn(request_body: Union[str, bytes], request_content_type: str) -> np.n
 
         # データがリスト形式の場合（[[val1, val2, ...], ...]）
         return np.array(data)
-    else:
-        raise ValueError(f"Unsupported content type: {request_content_type}")
+    msg = f"Unsupported content type: {request_content_type}"
+    raise ValueError(msg)
 
 
 def predict_fn(input_data: np.ndarray, model: Any) -> np.ndarray:
@@ -104,11 +103,10 @@ def output_fn(prediction: np.ndarray, accept: str) -> Union[str, bytes]:
         # 予測結果をJSONに変換
         response = json.dumps({"predictions": prediction.tolist()})
         return response
-    elif accept == "text/csv":
+    if accept == "text/csv":
         # 予測結果をCSVに変換
         response = pd.DataFrame(prediction).to_csv(header=False, index=False)
         return response
-    else:
-        # デフォルトはJSON
-        response = json.dumps({"predictions": prediction.tolist()})
-        return response
+    # デフォルトはJSON
+    response = json.dumps({"predictions": prediction.tolist()})
+    return response
