@@ -1,12 +1,9 @@
 import argparse
 import logging
 import os
-import subprocess
-import sys
 from typing import Any, Dict, Tuple
 
 import joblib
-
 import numpy as np
 import pandas as pd
 from lightgbm import LGBMRegressor

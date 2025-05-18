@@ -8,9 +8,9 @@ subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "lightgbm", "
 import argparse
 import json
 import logging
+import os
 from pathlib import Path
 from typing import List, Tuple, Union
-import os
 
 import joblib
 import lightgbm as lgb
@@ -34,10 +34,10 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "--model-path", type=str, default=os.environ.get("SM_MODEL_PATH", "/opt/ml/processing/model/model.tar.gz")
+        "--model-path", type=str, default=os.environ.get("SM_MODEL_PATH", "/opt/ml/processing/model/model.tar.gz"),
     )
     parser.add_argument(
-        "--test-path", type=str, default=os.environ.get("SM_CHANNEL_TEST", "/opt/ml/processing/test/test.csv")
+        "--test-path", type=str, default=os.environ.get("SM_CHANNEL_TEST", "/opt/ml/processing/test/test.csv"),
     )
     parser.add_argument(
         "--feature-names-path",
@@ -45,7 +45,7 @@ def parse_args() -> argparse.Namespace:
         default=os.environ.get("SM_FEATURE_NAMES", "/opt/ml/processing/train/features.txt"),
     )
     parser.add_argument(
-        "--output-path", type=str, default=os.environ.get("SM_OUTPUT_DATA_DIR", "/opt/ml/processing/evaluation")
+        "--output-path", type=str, default=os.environ.get("SM_OUTPUT_DATA_DIR", "/opt/ml/processing/evaluation"),
     )
 
     return parser.parse_args()

@@ -9,8 +9,8 @@ subprocess.run(
 sys.path.append("/opt/ml/processing/deps")
 import argparse
 import logging
-import pickle
 import os
+import pickle
 from pathlib import Path
 from typing import Dict, Tuple, Union
 
