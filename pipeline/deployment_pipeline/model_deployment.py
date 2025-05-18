@@ -1,7 +1,7 @@
 import time
 
 import boto3
-from pipeline_aws import get_session
+from pipeline.model_pipeline.pipeline_aws import get_session
 from sagemaker.model import ModelPackage
 from sagemaker.serverless.serverless_inference_config import ServerlessInferenceConfig
 

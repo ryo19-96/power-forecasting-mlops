@@ -6,9 +6,8 @@ import sagemaker
 import sagemaker.session
 from botocore.client import BaseClient
 from omegaconf import OmegaConf
-from sagemaker import hyperparameters
 from sagemaker.inputs import TrainingInput
-from sagemaker.jumpstart.estimator import JumpStartEstimator
+from sagemaker.sklearn.estimator import SKLearn
 from sagemaker.model_metrics import MetricsSource, ModelMetrics
 from sagemaker.processing import ProcessingInput, ProcessingOutput, ScriptProcessor
 from sagemaker.sklearn.processing import SKLearnProcessor
@@ -20,11 +19,11 @@ from sagemaker.workflow.pipeline import Pipeline
 from sagemaker.workflow.properties import PropertyFile
 from sagemaker.workflow.step_collections import RegisterModel
 from sagemaker.workflow.steps import ProcessingStep, TrainingStep
+from sagemaker.model import Model
+from sagemaker.sklearn.model import SKLearnModel
 
-BASE_DIR = Path(__file__).parent
-CONFIG_PATH = BASE_DIR / "config.yaml"
-config = OmegaConf.load(CONFIG_PATH)
-pipeline_config = config.get("pipeline", {})
+# srcディレクトリのパスを取得
+BASE_DIR = Path(__file__).parent.parent.parent / "src"
 
 
 def get_sagemaker_client(region: str) -> BaseClient:
@@ -75,6 +74,7 @@ def get_pipeline(
     pipeline_name: str = "PowerForecastPipeline",
     base_job_prefix: str = "PowerForecast",
     environment: str = "dev",
+    pipeline_config: Union[OmegaConf, None] = None,
 ) -> Pipeline:
     """パイプラインを取得する関数
 
@@ -87,6 +87,7 @@ def get_pipeline(
         pipeline_name (str, optional): パイプライン名
         base_job_prefix (str, optional): ジョブプレフィックス
         environment (str, optional): 環境名（dev, prodなど）
+        pipeline_config (OmegaConf, optional): パイプライン設定（デフォルトNone）
 
     Returns:
         Pipeline: SageMakerパイプラインオブジェクト
@@ -210,35 +211,49 @@ def get_pipeline(
     )
 
     model_path = f"s3://{sagemaker_session.default_bucket()}/{base_job_prefix}/Train"
-    train_model_id, train_model_version = "lightgbm-regression-model", "*"
-    lgbm_hyperparameters = hyperparameters.retrieve_default(
-        model_id=train_model_id,
-        model_version=train_model_version,
-    )
-    lgbm_hyperparameters["metric"] = "auto"
-    # 実行環境となるコンテナイメージを取得
-    # jumpstartのビルトインモデルを使用する
-    lgbm_train = JumpStartEstimator(
-        model_id=train_model_id,
-        model_version=train_model_version,
-        instance_type=training_instance_type,
-        instance_count=training_instance_count,
-        output_path=model_path,
-        base_job_name=f"{base_job_prefix}/train",
-        sagemaker_session=sagemaker_session,
+
+    # SKLearn estimatorを作成
+    train_estimator = SKLearn(
+        entry_point="train.py",
+        source_dir=str(BASE_DIR),  # srcディレクトリを指定
         role=role,
-        hyperparameters=lgbm_hyperparameters,
+        instance_type=training_instance_type,
+        instance_count=1,  # SKLearnは並列学習をサポートしていないので"1"固定
+        framework_version="1.2-1",
+        base_job_name=f"{base_job_prefix}/train",
+        hyperparameters={"n_estimators": 500},
+        output_path=model_path,
+        py_version="py3",
     )
 
     step_train = TrainingStep(
         name="TrainModel",
-        estimator=lgbm_train,
+        estimator=train_estimator,
         inputs={
             "train": TrainingInput(
                 s3_data=step_process.properties.ProcessingOutputConfig.Outputs["train"].S3Output.S3Uri,
                 content_type="text/csv",
             ),
         },
+    )
+
+    # デプロイ時に必要なイメージURI
+    sklearn_inf_image = sagemaker.image_uris.retrieve(
+        framework="sklearn",
+        region=region,
+        version="1.2-1",
+        py_version="py3",
+        instance_type="ml.m5.large",
+        image_scope="inference",
+    )
+
+    model = SKLearnModel(
+        image_uri=sklearn_inf_image,
+        model_data=step_train.properties.ModelArtifacts.S3ModelArtifacts,
+        role=role,
+        entry_point="inference.py",
+        source_dir="src",
+        sagemaker_session=sagemaker_session,
     )
 
     # モデルの評価ステップを追加
@@ -358,10 +373,10 @@ def get_pipeline(
 
     step_register = RegisterModel(
         name="RegisterPowerForecastModel",
-        estimator=lgbm_train,
+        model=model,
         model_data=step_train.properties.ModelArtifacts.S3ModelArtifacts,
-        content_types=["text/csv"],
-        response_types=["text/csv"],
+        content_types=["application/json"],
+        response_types=["application/json"],
         inference_instances=["ml.m5.large"],
         transform_instances=["ml.m5.large"],
         model_package_group_name=model_package_group_name,

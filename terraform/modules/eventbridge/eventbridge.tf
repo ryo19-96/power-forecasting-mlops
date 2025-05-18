@@ -1,3 +1,4 @@
+# model registryに"PendingManualApproval"の状態になったときに、Lambdaを呼び出すEventBridgeの設定
 variable "aws_lambda_function" {
   type = object({
     arn           = string
@@ -31,3 +32,5 @@ resource "aws_cloudwatch_event_target" "send_approval_email" {
   arn  = var.aws_lambda_function.arn
 }
 
+
+# メール承認によってApprovalされたときに、Lambdaを呼び出すEventBridgeの設定

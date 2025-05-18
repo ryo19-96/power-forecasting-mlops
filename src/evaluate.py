@@ -35,7 +35,7 @@ def load_model(model_tar_path: str) -> lgb.Booster:
     with tarfile.open(model_tar_path, "r:gz") as tar:
         tar.extractall(path=extract_dir)
 
-    model_path = next(Path(extract_dir).rglob("model.pkl"))
+    model_path = next(Path(extract_dir).rglob("model.joblib"))
 
     return joblib.load(model_path)
 
