@@ -1,11 +1,10 @@
 # noqa: INP001
+import logging
 import os
 import urllib.parse
 from typing import Any, Dict
 
 import boto3
-
-import logging
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
