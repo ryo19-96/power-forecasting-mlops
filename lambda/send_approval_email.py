@@ -29,11 +29,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> None:
         Source=approver_email,
         Destination={"ToAddresses": [approver_email]},
         Message={
-            "Subject": {"Data": "Model approval required"},
+            "Subject": {"Data": "model approval request"},
             "Body": {
                 "Html": {
                     "Data": f"""
-                        <p>New model registered:</p>
+                        <p>New model registered</p>
                         <p><b>{model_package_arn}</b></p>
                         <p>
                             <a href="{approve_url}">✅ Approve</a> |

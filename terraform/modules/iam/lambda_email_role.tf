@@ -1,4 +1,4 @@
-# Lambda用IAMロール
+# Lambdaでemailを送る用IAMロール
 resource "aws_iam_role" "lambda_email_role" {
   name = "lambda-email-role-${terraform.workspace}"
   assume_role_policy = jsonencode(
@@ -19,10 +19,6 @@ resource "aws_iam_role" "lambda_email_role" {
     Environment = terraform.workspace
     Project     = "PowerForecasting"
   }
-}
-
-output "lambda_email_role" {
-  value = aws_iam_role.lambda_email_role
 }
 
 resource "aws_iam_policy" "ses_send" {
@@ -52,4 +48,8 @@ resource "aws_iam_policy" "ses_send" {
 resource "aws_iam_role_policy_attachment" "lambda_email_attach" {
   role       = aws_iam_role.lambda_email_role.name
   policy_arn = aws_iam_policy.ses_send.arn
+}
+
+output "lambda_email_role" {
+  value = aws_iam_role.lambda_email_role
 }

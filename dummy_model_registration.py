@@ -1,16 +1,16 @@
 """
-model registryにダミーモデルを"PendingManualApproval"で登録する
+model registryにダミーモデルを"PendingManualApproval"で登録するスクリプト
 model pipelineを動作させなくてもその後の承認フロー確認用
 """
 
 import boto3
 
-sm = boto3.client("sagemaker")
+sagemaker_client = boto3.client("sagemaker")
 group_name = "PowerForecastPackageGroup"
 
-model_pkg_response = sm.create_model_package(
+model_pkg_response = sagemaker_client.create_model_package(
     ModelPackageGroupName=group_name,
-    ModelPackageDescription="Dummy package for testing",
+    ModelPackageDescription="Dummy package",
     InferenceSpecification={
         "Containers": [
             {

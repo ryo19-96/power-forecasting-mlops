@@ -20,14 +20,17 @@ module "iam" {
 }
 
 module "lambda" {
-  source                 = "./modules/lambda"
-  lambda_email_role_arn  = module.iam.lambda_email_role.arn
-  approval_email_address = var.approval_email_address
+  source                         = "./modules/lambda"
+  lambda_email_role_arn          = module.iam.lambda_email_role.arn
+  lambda_update_package_role_arn = module.iam.lambda_update_package_role.arn
+  approval_email_address         = var.approval_email_address
+  api_gateway_url                = module.api_gateway.approve_api_url
 }
 
-# module "api_gateway" {
-#   source = "./modules/api_gateway"
-# }
+module "api_gateway" {
+  source              = "./modules/api_gateway"
+  aws_lambda_function = module.lambda.update_package_lambda
+}
 
 module "eventbridge" {
   source              = "./modules/eventbridge"
