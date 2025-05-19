@@ -4,14 +4,16 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import yaml
-from pipeline_aws import get_pipeline
+
+from model_pipeline import get_pipeline
 
 run_time = datetime.now(ZoneInfo("Asia/Tokyo")).strftime("%Y%m%d-%H%M%S")
 
-config_path = Path(__file__).parent / "config.yaml"
+config_path = Path(__file__).parent.parent / "config.yaml"
 with Path(config_path).open("r") as f:
     config = yaml.safe_load(f)
 run_config = config.get("run", {})
+pipeline_config = config.get("pipeline", {})
 
 region = run_config.get("region", "ap-northeast-1")
 role = run_config.get("role")
@@ -25,6 +27,7 @@ pipeline = get_pipeline(
     default_bucket=default_bucket,
     pipeline_name=pipeline_name,
     environment=environment,
+    pipeline_config=pipeline_config,
 )
 
 # 定義をSageMakerに登録
@@ -43,7 +46,7 @@ if os.getenv("CI") == "true":
     # 正常終了かチェック
     status = execution.describe()["PipelineExecutionStatus"]
     if status != "Succeeded":
-        msg = f"Pipeline execution failed: {status}"
+        msg = f"Pipeline failed: {status}"
         raise RuntimeError(msg)
     else:
         print("Pipeline execution succeeded.")

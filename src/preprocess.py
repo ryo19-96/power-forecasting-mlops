@@ -9,6 +9,7 @@ subprocess.run(
 sys.path.append("/opt/ml/processing/deps")
 import argparse
 import logging
+import os
 import pickle
 from pathlib import Path
 from typing import Dict, Tuple, Union
@@ -16,12 +17,31 @@ from typing import Dict, Tuple, Union
 import holidays
 import numpy as np
 import pandas as pd
-from feature_encoder import FeatureEncoder
 from omegaconf import DictConfig, OmegaConf
+
+from feature_encoder import FeatureEncoder
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
+
+
+def parse_args() -> argparse.Namespace:
+    """
+    SageMakerから渡される引数をパースする
+
+    Returns:
+        argparse.Namespace: パースされた引数
+    """
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--input-data",
+        type=str,
+        default=os.environ.get("SM_CHANNEL_INPUT", "/opt/ml/processing/input_data/merged_data.pkl"),
+    )
+
+    return parser.parse_args()
 
 
 def load_config(config_path: str) -> DictConfig:
@@ -356,9 +376,9 @@ def save_encoders(
 
 if __name__ == "__main__":
     logger.info("Starting processing data...")
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input-data", type=str)
-    args = parser.parse_args()
+
+    args = parse_args()
+
     input_path = args.input_data
     base_dir = "/opt/ml/processing"
 

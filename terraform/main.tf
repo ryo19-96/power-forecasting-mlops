@@ -25,6 +25,8 @@ module "lambda" {
   lambda_update_package_role_arn = module.iam.lambda_update_package_role.arn
   approval_email_address         = var.approval_email_address
   api_gateway_url                = module.api_gateway.approve_api_url
+  lambda_deploy_role_arn         = module.iam.lambda_deploy_role.arn
+  pipeline_exec_role_arn         = module.iam.power_forecasting_role_arn
 }
 
 module "api_gateway" {
@@ -33,6 +35,7 @@ module "api_gateway" {
 }
 
 module "eventbridge" {
-  source              = "./modules/eventbridge"
-  aws_lambda_function = module.lambda.send_approval_email_lambda
+  source                 = "./modules/eventbridge"
+  aws_lambda_function    = module.lambda.send_approval_email_lambda
+  lambda_deploy_function = module.lambda.deploy_serverless_lambda
 }

@@ -8,6 +8,7 @@ subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "lightgbm", "
 import argparse
 import json
 import logging
+import os
 from pathlib import Path
 from typing import List, Tuple, Union
 
@@ -23,6 +24,33 @@ logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
 
+def parse_args() -> argparse.Namespace:
+    """
+    SageMakerから渡される評価引数をパースする
+
+    Returns:
+        argparse.Namespace: パースされた引数
+    """
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--model-path", type=str, default=os.environ.get("SM_MODEL_PATH", "/opt/ml/processing/model/model.tar.gz"),
+    )
+    parser.add_argument(
+        "--test-path", type=str, default=os.environ.get("SM_CHANNEL_TEST", "/opt/ml/processing/test/test.csv"),
+    )
+    parser.add_argument(
+        "--feature-names-path",
+        type=str,
+        default=os.environ.get("SM_FEATURE_NAMES", "/opt/ml/processing/train/features.txt"),
+    )
+    parser.add_argument(
+        "--output-path", type=str, default=os.environ.get("SM_OUTPUT_DATA_DIR", "/opt/ml/processing/evaluation"),
+    )
+
+    return parser.parse_args()
+
+
 def load_model(model_tar_path: str) -> lgb.Booster:
     """model.tar.gz から model.pickle を取り出してモデルを返す
     Args:
@@ -35,7 +63,7 @@ def load_model(model_tar_path: str) -> lgb.Booster:
     with tarfile.open(model_tar_path, "r:gz") as tar:
         tar.extractall(path=extract_dir)
 
-    model_path = next(Path(extract_dir).rglob("model.pkl"))
+    model_path = next(Path(extract_dir).rglob("model.joblib"))
 
     return joblib.load(model_path)
 
@@ -92,12 +120,7 @@ def load_test_data(
 if __name__ == "__main__":
     logger.info("Starting evaluate...")
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model-path", type=str)
-    parser.add_argument("--test-path", type=str)
-    parser.add_argument("--feature-names-path", type=str)
-    parser.add_argument("--output-path", type=str)
-    args = parser.parse_args()
+    args = parse_args()
     # コマンドライン引数の取得
     model_path = args.model_path
     test_data_path = args.test_path

@@ -1,6 +1,7 @@
 run:
   region: ap-northeast-1
   role: arn:aws:iam::163817410757:role/service-role/power-forecasting-role-dev
+  deployment_role: arn:aws:iam::163817410757:role/lambda-deploy-serverless-role-dev
   default_bucket: power-forecasting-mlops-dev
   pipeline_name: PowerForecastPipeline
   environment: dev
@@ -13,15 +14,3 @@ pipeline:
   training_instance_type: ml.m5.large
   training_instance_count: 1
   mse_threshold: 999999.0
-
-encoders:
-  - name: One-Hot
-    columns:
-      - weather_category
-
-feature_thresholds:
-  hot_day: 30
-  cold_day: 5
-  cdd_base: 18
-  hdd_base: 18
-

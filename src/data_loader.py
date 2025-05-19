@@ -12,6 +12,29 @@ logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
 
+def parse_args() -> argparse.Namespace:
+    """
+    SageMakerから渡される学習引数をパースする
+
+    Returns:
+        argparse.Namespace: パースされた引数
+    """
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--weather-input-data",
+        type=str,
+        default=os.environ.get("SM_CHANNEL_WEATHER", "/opt/ml/processing/input/weather/weather_data.csv"),
+    )
+    parser.add_argument(
+        "--power-usage-input-data",
+        type=str,
+        default=os.environ.get("SM_CHANNEL_POWER_USAGE", "/opt/ml/processing/input/power_usage/"),
+    )
+
+    return parser.parse_args()
+
+
 class DataLoader:
     """データ読み込みを担当するクラス"""
 
@@ -122,10 +145,7 @@ class DataLoader:
 if __name__ == "__main__":
     logger.info("Starting load data...")
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--weather-input-data", type=str)
-    parser.add_argument("--power-usage-input-data", type=str)
-    args = parser.parse_args()
+    args = parse_args()
 
     base_dir = "/opt/ml/processing"
 

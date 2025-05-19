@@ -19,6 +19,7 @@ subprocess.run(
 )
 import argparse
 import logging
+import os
 import tarfile
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union
@@ -36,6 +37,40 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
+
+
+def parse_args() -> argparse.Namespace:
+    """
+    SageMakerから渡される可視化引数をパースする
+
+    Returns:
+        argparse.Namespace: パースされた引数
+    """
+    parser = argparse.ArgumentParser()
+
+    # 必須のSageMaker引数
+    parser.add_argument(
+        "--model-path",
+        type=str,
+        default=os.environ.get("SM_MODEL_PATH", "/opt/ml/processing/model/model.tar.gz"),
+    )
+    parser.add_argument(
+        "--test-path",
+        type=str,
+        default=os.environ.get("SM_CHANNEL_TEST", "/opt/ml/processing/test/test.csv"),
+    )
+    parser.add_argument(
+        "--feature-names-path",
+        type=str,
+        default=os.environ.get("SM_FEATURE_NAMES", "/opt/ml/processing/train/features.txt"),
+    )
+    parser.add_argument(
+        "--output-path",
+        type=str,
+        default=os.environ.get("SM_OUTPUT_DATA_DIR", "/opt/ml/processing/visualizations"),
+    )
+
+    return parser.parse_args()
 
 
 class Visualizer:
@@ -338,7 +373,7 @@ def load_model(model_tar_path: str) -> lgb.Booster:
     with tarfile.open(model_tar_path, "r:gz") as tar:
         tar.extractall(path=extract_dir)
 
-    model_path = next(Path(extract_dir).rglob("model.pkl"))
+    model_path = next(Path(extract_dir).rglob("model.joblib"))
 
     return joblib.load(model_path)
 
@@ -346,12 +381,7 @@ def load_model(model_tar_path: str) -> lgb.Booster:
 if __name__ == "__main__":
     logger.info("Starting visualization...")
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model-path", type=str)
-    parser.add_argument("--test-path", type=str)
-    parser.add_argument("--feature-names-path", type=str)
-    parser.add_argument("--output-path", type=str)
-    args = parser.parse_args()
+    args = parse_args()
     # コマンドライン引数の取得
     model_path = args.model_path
     test_data_path = args.test_path

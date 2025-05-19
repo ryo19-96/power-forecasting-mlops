@@ -38,4 +38,4 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ap-northeast-1
-        run: poetry run python pipeline/model/run_pipeline.py
+        run: poetry run python pipeline/model_pipeline/run_pipeline.py

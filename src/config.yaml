@@ -1,0 +1,10 @@
+encoders:
+  - name: One-Hot
+    columns:
+      - weather_category
+
+feature_thresholds:
+  hot_day: 30
+  cold_day: 5
+  cdd_base: 18
+  hdd_base: 18
