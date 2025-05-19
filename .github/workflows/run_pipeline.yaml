@@ -5,10 +5,16 @@ on:
       - main
     paths:
       - "pipeline/**"
+      - "src/**"
+      - "lambda/**"
+      - "terraform/**"
       - ".github/workflows/**"
   pull_request:
     paths:
       - "pipeline/**"
+      - "src/**"
+      - "lambda/**"
+      - "terraform/**"
       - ".github/workflows/**"
 concurrency: # 複数動いた場合古いワークフローを中断する
   group: "run-pipeline"
