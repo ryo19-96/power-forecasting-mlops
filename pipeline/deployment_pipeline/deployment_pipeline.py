@@ -1,7 +1,5 @@
-from datetime import datetime
 from pathlib import Path
 from typing import Union
-from zoneinfo import ZoneInfo
 
 import boto3
 import botocore.client
@@ -60,8 +58,6 @@ def get_latest_approved_model_package(sagemaker_client: botocore.client, model_p
     return response["ModelPackageSummaryList"][0]["ModelPackageArn"]
 
 
-run_time = datetime.now(ZoneInfo("Asia/Tokyo")).strftime("%Y%m%d-%H%M%S")
-
 config_path = Path(__file__).parent.parent / "config.yaml"
 config = load_config(config_path)
 run_config = config.get("run", {})
@@ -79,7 +75,7 @@ sagemaker_session = get_session(region=region, default_bucket=default_bucket)
 sagemaker_client = boto3.client("sagemaker", region_name=region)
 package_arn = get_latest_approved_model_package(sagemaker_client, model_package_name)
 model_package_arn = ParameterString("ModelPackageArn", default_value=package_arn)
-endpoint_name = ParameterString("EndpointName", default_value=f"power-forecast-srvless-{run_time}")
+endpoint_name = ParameterString("EndpointName", default_value="power-forecast-serverless")
 
 
 deploy_lambda = Lambda(
