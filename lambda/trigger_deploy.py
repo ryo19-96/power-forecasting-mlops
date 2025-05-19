@@ -1,7 +1,8 @@
 # noqa: INP001
 import os
-import time
+from datetime import datetime
 from typing import Any, Dict
+from zoneinfo import ZoneInfo
 
 import boto3
 
@@ -9,7 +10,10 @@ sagemake_client = boto3.client("sagemaker")
 PIPELINE_NAME = os.environ["DEPLOY_PIPELINE"]
 ROLE_ARN = os.environ["PIPELINE_EXEC_ROLE"]
 
-endpoint_name = f"power-forecast-serverless-{int(time.time())}"
+# エンドポイント名は日本時間のタイムスタンプを付与
+jst_now = datetime.now(ZoneInfo("Asia/Tokyo"))
+timestamp_str = jst_now.strftime("%Y%m%d-%H%M%S")
+endpoint_name = f"power-forecast-serverless-{timestamp_str}"
 
 
 def lambda_handler(event, _) -> Dict[str, Any]:
