@@ -4,7 +4,8 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import yaml
-from pipeline_aws import get_pipeline
+
+from model_pipeline import get_pipeline
 
 run_time = datetime.now(ZoneInfo("Asia/Tokyo")).strftime("%Y%m%d-%H%M%S")
 

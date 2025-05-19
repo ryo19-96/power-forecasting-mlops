@@ -70,6 +70,7 @@ lint.ignore = [
     "C901",
     "PLE1205",
     "PD011",
+    "ANN001",
 ]
 target-version = "py311"
 exclude = [

@@ -60,3 +60,31 @@ output "update_package_lambda" {
     invoke_arn    = aws_lambda_function.update_package.invoke_arn
   }
 }
+
+# deploy用 lambda 関数定義
+variable "lambda_deploy_role_arn" {
+  type = string
+}
+variable "pipeline_exec_role_arn" {
+  type = string
+}
+resource "aws_lambda_function" "deploy_serverless" {
+  function_name    = "deploy-serverless-lambda-${terraform.workspace}"
+  filename         = "../lambda/trigger_deploy.zip"
+  source_code_hash = filebase64sha256("../lambda/trigger_deploy.zip")
+  handler          = "trigger_deploy.lambda_handler"
+  runtime          = "python3.10"
+  role             = var.lambda_deploy_role_arn
+  environment {
+    variables = {
+      PIPELINE_EXEC_ROLE = var.pipeline_exec_role_arn
+      DEPLOY_PIPELINE    = "PowerForecastDeploymentPipeline"
+    }
+  }
+}
+output "deploy_serverless_lambda" {
+  value = {
+    arn           = aws_lambda_function.deploy_serverless.arn
+    function_name = aws_lambda_function.deploy_serverless.function_name
+  }
+}

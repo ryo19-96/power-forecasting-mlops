@@ -25,13 +25,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--model-dir", type=str, default=os.environ.get("SM_MODEL_DIR"))
-    parser.add_argument("--train", type=str)
+    parser.add_argument("--train", type=str, default="/opt/ml/input/data/train")
 
     # パラメータ
-    parser.add_argument("--n_estimators", type=int, default=500)
+    parser.add_argument("--n_estimators", type=int, default=100)
     parser.add_argument("--learning_rate", type=float, default=0.1)
-    parser.add_argument("--max_depth", type=int, default=-1)
-    parser.add_argument("--random_state", type=int, default=42)
+    parser.add_argument("--random_state", type=int, default=10)
 
     return parser.parse_args()
 
@@ -74,10 +73,9 @@ def train(X: np.ndarray, y: np.ndarray, hyperparameters: Dict[str, Any]) -> LGBM
 
     # ハイパーパラメータを設定してモデルを作成
     model = LGBMRegressor(
-        n_estimators=hyperparameters.get("n_estimators", 500),
+        n_estimators=hyperparameters.get("n_estimators", 100),
         learning_rate=hyperparameters.get("learning_rate", 0.1),
-        max_depth=hyperparameters.get("max_depth", -1),
-        random_state=hyperparameters.get("random_state", 42),
+        random_state=hyperparameters.get("random_state", 10),
         objective="regression",
         metric="rmse",
     )
@@ -120,7 +118,6 @@ if __name__ == "__main__":
     hyperparameters = {
         "n_estimators": args.n_estimators,
         "learning_rate": args.learning_rate,
-        "max_depth": args.max_depth,
         "random_state": args.random_state,
     }
 

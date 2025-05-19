@@ -220,7 +220,7 @@ def get_pipeline(
         instance_count=1,  # SKLearnは並列学習をサポートしていないので"1"固定
         framework_version="1.2-1",
         base_job_name=f"{base_job_prefix}/train",
-        hyperparameters={"n_estimators": 500},
+        hyperparameters={"n_estimators": 100},
         output_path=model_path,
         py_version="py3",
     )
@@ -318,8 +318,7 @@ def get_pipeline(
         sagemaker_session=sagemaker_session,
         role=role,
     )
-    # UI用の画像を出すのか、HTMLレポートを作るのか、ログだけなのかなど、可視化の目的と出力フォーマットを後で
-    # はっきりさせておくと良い。S3Uri + ファイル名 で保存場所を明確にしておくと、Looker や BIツールとの連携も楽
+
     step_visualization = ProcessingStep(
         name="VisualizeResults",
         processor=visualization_script_processor,
