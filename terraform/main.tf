@@ -20,22 +20,23 @@ module "iam" {
 }
 
 module "lambda" {
-  source                         = "./modules/lambda"
-  lambda_email_role_arn          = module.iam.lambda_email_role.arn
-  lambda_update_package_role_arn = module.iam.lambda_update_package_role.arn
-  approval_email_address         = var.approval_email_address
-  api_gateway_url                = module.api_gateway.approve_api_url
-  lambda_deploy_role_arn         = module.iam.lambda_deploy_role.arn
-  pipeline_exec_role_arn         = module.iam.power_forecasting_role_arn
+  source                           = "./modules/lambda"
+  lambda_email_role_arn            = module.iam.lambda_email_role.arn
+  lambda_approve_model_role_arn    = module.iam.lambda_approve_model_role.arn
+  approval_email_address           = var.approval_email_address
+  api_gateway_url                  = module.api_gateway.approve_api_url
+  pipeline_exec_role_arn           = module.iam.power_forecasting_role_arn # sagemakerの実行ロール
+  lambda_succeeded_deploy_role_arn = module.iam.succeeded_deploy_role.arn
 }
 
 module "api_gateway" {
   source              = "./modules/api_gateway"
-  aws_lambda_function = module.lambda.update_package_lambda
+  aws_lambda_function = module.lambda.approve_model_lambda
 }
 
 module "eventbridge" {
-  source                 = "./modules/eventbridge"
-  aws_lambda_function    = module.lambda.send_approval_email_lambda
-  lambda_deploy_function = module.lambda.deploy_serverless_lambda
+  source                           = "./modules/eventbridge"
+  aws_lambda_function              = module.lambda.send_approval_email_lambda
+  lambda_model_approved_function   = module.lambda.approve_model_lambda
+  lambda_succeeded_deploy_function = module.lambda.succeeded_deploy_lambda
 }

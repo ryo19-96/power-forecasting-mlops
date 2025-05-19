@@ -1,4 +1,5 @@
-# model registryに"PendingManualApproval"の状態になったときに、Lambdaを呼び出すEventBridgeの設定
+
+# === model registryで"PendingManualApproval"の状態になったときに、Lambdaを呼び出すEventBridgeの設定 ===
 variable "aws_lambda_function" {
   type = object({
     arn           = string
@@ -18,6 +19,12 @@ resource "aws_cloudwatch_event_rule" "model_on_pending_manual" {
   })
 }
 
+# イベントが発生したとき呼び出す Lambda 関数を指定する（ターゲットとしてLambdaを指定するため）
+resource "aws_cloudwatch_event_target" "send_approval_email" {
+  rule = aws_cloudwatch_event_rule.model_on_pending_manual.name
+  arn  = var.aws_lambda_function.arn
+}
+
 # Lambda 関数に対して、EventBridge からの呼び出しを許可する設定
 resource "aws_lambda_permission" "allow_eventbridge" {
   action        = "lambda:InvokeFunction"
@@ -26,15 +33,8 @@ resource "aws_lambda_permission" "allow_eventbridge" {
   source_arn    = aws_cloudwatch_event_rule.model_on_pending_manual.arn
 }
 
-# イベントが発生したとき呼び出す Lambda 関数を指定する
-resource "aws_cloudwatch_event_target" "send_approval_email" {
-  rule = aws_cloudwatch_event_rule.model_on_pending_manual.name
-  arn  = var.aws_lambda_function.arn
-}
-
-
-# メール承認によってApprovalされたときに、Lambdaを呼び出すEventBridgeの設定
-variable "lambda_deploy_function" {
+# === メール承認によってApprovalされたときに、Lambdaを呼び出すEventBridgeの設定 ===
+variable "lambda_model_approved_function" {
   type = object({
     arn           = string
     function_name = string
@@ -52,14 +52,47 @@ resource "aws_cloudwatch_event_rule" "when_model_approved" {
   })
 }
 
+resource "aws_cloudwatch_event_target" "deploy_target" {
+  rule = aws_cloudwatch_event_rule.when_model_approved.name
+  arn  = var.lambda_model_approved_function.arn
+}
+
 resource "aws_lambda_permission" "allow_eventbridge_deploy_lambda" {
   action        = "lambda:InvokeFunction"
-  function_name = var.lambda_deploy_function.function_name
+  function_name = var.lambda_model_approved_function.function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.when_model_approved.arn
 }
 
-resource "aws_cloudwatch_event_target" "deploy_target" {
-  rule = aws_cloudwatch_event_rule.when_model_approved.name
-  arn  = var.lambda_deploy_function.arn
+# === pipelineが"Succeeded"になったときに、Lambdaを呼び出すEventBridgeの設定 ===
+variable "lambda_succeeded_deploy_function" {
+  type = object({
+    arn           = string
+    function_name = string
+  })
 }
+resource "aws_cloudwatch_event_rule" "pipeline_succeeded" {
+  name = "pipeline-succeeded-rule"
+  event_pattern = jsonencode({
+    source        = ["aws.sagemaker"],
+    "detail-type" = ["SageMaker Pipeline Execution Status Change"],
+    detail = {
+      PipelineExecutionStatus = ["Succeeded"],
+      PipelineName            = ["PowerForecastDeploymentPipeline"]
+    }
+  })
+}
+
+resource "aws_cloudwatch_event_target" "result_lambda_target" {
+  rule = aws_cloudwatch_event_rule.pipeline_succeeded.name
+  arn  = var.lambda_succeeded_deploy_function.arn
+}
+
+resource "aws_lambda_permission" "allow_eventbridge_invoke" {
+  action        = "lambda:InvokeFunction"
+  function_name = var.lambda_succeeded_deploy_function.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.pipeline_succeeded.arn
+}
+
+

@@ -1,4 +1,4 @@
-# email送信用 lambda 関数定義
+# === email送信用 lambda 関数定義 ===
 variable "lambda_email_role_arn" {
   type = string
 }
@@ -6,7 +6,6 @@ variable "lambda_email_role_arn" {
 variable "approval_email_address" {
   type = string
 }
-
 
 variable "api_gateway_url" {
   type = string
@@ -39,52 +38,58 @@ output "send_approval_email_lambda" {
 }
 
 
-# emailでの承認後用 lambda 関数定義
-variable "lambda_update_package_role_arn" {
-  type = string
-}
-
-resource "aws_lambda_function" "update_package" {
-  function_name    = "update-package-lambda-${terraform.workspace}"
-  filename         = "../lambda/update_package.zip"
-  source_code_hash = filebase64sha256("../lambda/update_package.zip")
-  handler          = "update_package.lambda_handler"
-  runtime          = "python3.10"
-  role             = var.lambda_update_package_role_arn
-}
-
-output "update_package_lambda" {
-  value = {
-    arn           = aws_lambda_function.update_package.arn
-    function_name = aws_lambda_function.update_package.function_name
-    invoke_arn    = aws_lambda_function.update_package.invoke_arn
-  }
-}
-
-# deploy用 lambda 関数定義
-variable "lambda_deploy_role_arn" {
+# === emailでApproveを押した時に動作用 lambda（API Gateway) 関数定義 ===
+variable "lambda_approve_model_role_arn" {
   type = string
 }
 variable "pipeline_exec_role_arn" {
   type = string
 }
-resource "aws_lambda_function" "deploy_serverless" {
-  function_name    = "deploy-serverless-lambda-${terraform.workspace}"
-  filename         = "../lambda/trigger_deploy.zip"
-  source_code_hash = filebase64sha256("../lambda/trigger_deploy.zip")
-  handler          = "trigger_deploy.lambda_handler"
+
+resource "aws_lambda_function" "approve_model_lambda" {
+  function_name    = "approve_model-lambda-${terraform.workspace}"
+  filename         = "../lambda/approved_model.zip"
+  source_code_hash = filebase64sha256("../lambda/approved_model.zip")
+  handler          = "approved_model.lambda_handler"
   runtime          = "python3.10"
-  role             = var.lambda_deploy_role_arn
+  role             = var.lambda_approve_model_role_arn
   environment {
     variables = {
-      PIPELINE_EXEC_ROLE = var.pipeline_exec_role_arn
-      DEPLOY_PIPELINE    = "PowerForecastDeploymentPipeline"
+      SAGEMAKER_ROLE = var.pipeline_exec_role_arn
+      PIPELINE_NAME  = "PowerForecastDeploymentPipeline"
+      ENV            = "${terraform.workspace}"
     }
   }
 }
-output "deploy_serverless_lambda" {
+
+output "approve_model_lambda" {
   value = {
-    arn           = aws_lambda_function.deploy_serverless.arn
-    function_name = aws_lambda_function.deploy_serverless.function_name
+    arn           = aws_lambda_function.approve_model_lambda.arn
+    function_name = aws_lambda_function.approve_model_lambda.function_name
+    invoke_arn    = aws_lambda_function.approve_model_lambda.invoke_arn
+  }
+}
+
+# === pipeline成功を検知して結果をParameter Storeに記録する lambda + EventBridge 定義===
+variable "lambda_succeeded_deploy_role_arn" {
+  type = string
+}
+resource "aws_lambda_function" "succeeded_deploy" {
+  function_name = "succeeded-deploy-lambda"
+  filename      = "../lambda/succeeded_deploy.zip"
+  handler       = "succeeded_deploy.lambda_handler"
+  runtime       = "python3.10"
+  role          = var.lambda_succeeded_deploy_role_arn
+  environment {
+    variables = {
+      ENV = "${terraform.workspace}"
+    }
+  }
+}
+
+output "succeeded_deploy_lambda" {
+  value = {
+    arn           = aws_lambda_function.succeeded_deploy.arn
+    function_name = aws_lambda_function.succeeded_deploy.function_name
   }
 }
