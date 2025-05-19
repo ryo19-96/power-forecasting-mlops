@@ -28,9 +28,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--train", type=str, default="/opt/ml/input/data/train")
 
     # パラメータ
-    parser.add_argument("--n_estimators", type=int, default=100)
-    parser.add_argument("--learning_rate", type=float, default=0.1)
+    parser.add_argument("--n_estimators", type=int, default=50)
+    parser.add_argument("--learning_rate", type=float, default=0.5)
     parser.add_argument("--random_state", type=int, default=10)
+    parser.add_argument("--max_depth", type=int, default=5)
+    parser.add_argument("--num_leaves", type=int, default=30)
 
     return parser.parse_args()
 
@@ -73,9 +75,11 @@ def train(X: np.ndarray, y: np.ndarray, hyperparameters: Dict[str, Any]) -> LGBM
 
     # ハイパーパラメータを設定してモデルを作成
     model = LGBMRegressor(
-        n_estimators=hyperparameters.get("n_estimators", 100),
+        n_estimators=hyperparameters.get("n_estimators", 50),
         learning_rate=hyperparameters.get("learning_rate", 0.1),
         random_state=hyperparameters.get("random_state", 10),
+        max_depth=hyperparameters.get("max_depth", 5),
+        num_leaves=hyperparameters.get("num_leaves", 30),
         objective="regression",
         metric="rmse",
     )
@@ -119,6 +123,8 @@ if __name__ == "__main__":
         "n_estimators": args.n_estimators,
         "learning_rate": args.learning_rate,
         "random_state": args.random_state,
+        "max_depth": args.max_depth,
+        "num_leaves": args.num_leaves,
     }
 
     # データの読み込み
