@@ -23,7 +23,7 @@ def lambda_handler(event, _) -> None:
     package_arn = event["model_package_arn"]
     endpoint_name = event["endpoint_name"]
     memory_mb = event.get("memory_mb", 2048)
-    max_conc = event.get("max_conc", 5)
+    max_conc = event.get("max_conc", 1)
 
     # モデルを作成
     # エンドポイントが使うmodel名
