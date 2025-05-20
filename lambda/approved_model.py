@@ -1,10 +1,10 @@
 # noqa: INP001
+import logging
 import os
 import urllib.parse
 from typing import Any, Dict
 
 import boto3
-import logging
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -59,8 +59,10 @@ def lambda_handler(event: Dict[str, Any], _) -> None:
     logger.info(f"New model to deploy: {package_arn}")
 
     if prev == package_arn:
+        logger.info("Model already deployed. Skipping deployment.")
         return {"statusCode": 200, "body": "Model already deployed. Skipping deployment."}
 
+    logger.info("Starting deployment-pipeline.")
     # deployment_pipelineを実行
     sagemaker_client.start_pipeline_execution(
         PipelineName=PIPELINE_NAME,
@@ -74,5 +76,5 @@ def lambda_handler(event: Dict[str, Any], _) -> None:
     return {
         "statusCode": 200,
         "headers": {"Content-Type": "text/html"},
-        "body": f"<h3>{status} model</h3><p>{package_arn}</p>",
+        "body": f"<h3>{status} model</h3><p>{package_arn}</p><p>Deployment started.</p>",
     }
