@@ -14,13 +14,15 @@ import joblib
 import numpy as np
 import pandas as pd
 
+from preprocess import FeatureEngineering, load_config
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
 
 def model_fn(model_dir: str) -> Dict[str, Any]:
-    """保存されたモデルとエンコーダーを読み込む
+    """保存されたモデル・設定ファイル・エンコーダーを読み込む
 
     Args:
         model_dir (str): モデルが保存されているディレクトリパス
@@ -31,6 +33,10 @@ def model_fn(model_dir: str) -> Dict[str, Any]:
     # モデルの読み込み
     model_path = os.path.join(model_dir, "model.joblib")
     model = joblib.load(model_path)
+
+    # config.yaml の読み込み
+    config_path = os.path.join(model_dir, "config.yaml")
+    config = load_config(config_path)
 
     # エンコーダーの読み込み（存在する場合）
     encoders_dict = {}
@@ -47,33 +53,54 @@ def model_fn(model_dir: str) -> Dict[str, Any]:
             feature_names = [line.strip() for line in f if line.strip()]
         logger.info(f"Loaded {len(feature_names)} feature names")
 
-    return {"model": model, "encoders": encoders_dict, "feature_names": feature_names}
+    return {"model": model, "config": config, "encoders": encoders_dict, "feature_names": feature_names}
 
 
 def apply_encoders(df: pd.DataFrame, encoders_dict: Dict[str, Any]) -> pd.DataFrame:
-    """エンコーダーを適用する
+    """
+    エンコーダーを適用する
 
     Args:
         df (pd.DataFrame): 入力データ
-        encoders (Dict[str, Any]): エンコーダーの辞書
+        encoders_dict (Dict[str, Any]): エンコーダーの辞書
 
     Returns:
         pd.DataFrame: エンコードされたデータ
     """
     result_df = df.copy()
-
     for encoder in encoders_dict.values():
         # エンコーダーの対象の列が存在するか確認
-        columns_exist = all(col in df.columns for col in encoder.columns)
-        if columns_exist:
-            result_df = encoder.transform(result_df)
-
+        if hasattr(encoder, "columns"):
+            columns_exist = all(col in result_df.columns for col in encoder.columns)
+            if columns_exist:
+                result_df = encoder.transform(result_df)
     return result_df
 
 
-def input_fn(request_body: Union[str, bytes], request_content_type: str) -> pd.DataFrame:
+def astype_df(df: pd.DataFrame) -> pd.DataFrame:
+    """データフレームのカラムの型を変換する
+
+    Args:
+        df (pd.DataFrame): 入力データ
+
+    Returns:
+        pd.DataFrame: 型変換されたデータフレーム
     """
-    リクエストのボディをモデル入力に変換する関数
+    for col in df.columns:
+        # 日付変換
+        if col == "date":
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+        # 数値変換（strでもOK）
+        elif col in {"max_temp", "min_temp"}:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        # 明示的にstrへ変換
+        elif col == "weather":
+            df[col] = df[col].astype(str)
+    return df
+
+
+def input_fn(request_body: Union[str, bytes], request_content_type: str) -> pd.DataFrame:
+    """リクエストのボディをpythonオブジェクトに変換するしてデータフレームで返す関数
 
     Args:
         request_body (Union[str, bytes]): リクエストボディ
@@ -87,23 +114,36 @@ def input_fn(request_body: Union[str, bytes], request_content_type: str) -> pd.D
     """
     logger.info(f"Received request with content type: {request_content_type}")
 
+    columns_name = ["date", "max_temp", "min_temp", "weather"]
+
+    # CSVデータをデータフレームに変換
     if request_content_type == "text/csv":
-        # CSVデータをデータフレームに変換
-        df = pd.read_csv(pd.io.common.StringIO(request_body))
-        return df
+        df = pd.read_csv(
+            pd.io.common.StringIO(request_body),
+            header=None,  # ヘッダーなしを想定している
+            names=columns_name,
+        )
+        return astype_df(df)
+
+    # JSONデータをデータフレームに変換
     if request_content_type == "application/json":
-        # JSONデータをデータフレームに変換
         data = json.loads(request_body)
 
-        if isinstance(data, dict):
-            # データが辞書形式の場合（{"features": [...]}）
-            if "features" in data:
-                return pd.DataFrame(data["features"])
-            # データが辞書形式の場合（{"feature1": val1, "feature2": val2, ...}）
-            return pd.DataFrame([data])
+        # [{...}, {...}] 形式
+        if isinstance(data, list) and isinstance(data[0], dict):
+            df = pd.DataFrame(data)[columns_name]
+            return astype_df(df)
 
-        # データがリスト形式の場合（[[val1, val2, ...], ...]）
-        return pd.DataFrame(data)
+        # {"feature1": 23.4, ...} 形式
+        if isinstance(data, dict) and "features" not in data:
+            # 特徴量名がある場合、その順序に合わせる
+            df = pd.DataFrame([data])[columns_name]
+            return astype_df(df)
+
+        # {"feature1": [[...]]} 形式
+        if isinstance(data, dict) and "features" in data:
+            df = pd.DataFrame(data["features"], columns=columns_name)
+            return astype_df(df)
 
     msg = f"Unsupported content type: {request_content_type}"
     raise ValueError(msg)
@@ -111,7 +151,7 @@ def input_fn(request_body: Union[str, bytes], request_content_type: str) -> pd.D
 
 def predict_fn(input_data: pd.DataFrame, model_dict: Dict[str, Any]) -> np.ndarray:
     """
-    モデルを使用して予測を行う関数
+    モデルを使用して予測を行う関数（前処理を含む）
 
     Args:
         input_data (pd.DataFrame): 入力データ
@@ -121,34 +161,34 @@ def predict_fn(input_data: pd.DataFrame, model_dict: Dict[str, Any]) -> np.ndarr
         np.ndarray: モデルの予測結果
     """
     model = model_dict["model"]
-    encoders = model_dict.get("encoders", {})
+    config = model_dict["config"]
+    encoders_dict = model_dict.get("encoders", {})
     feature_names = model_dict.get("feature_names", [])
 
-    logger.info(f"Input data shape before preprocessing: {input_data.shape}")
+    # 特徴量エンジニアリング
+    feature_engineering = FeatureEngineering(config=config)
+    input_data = feature_engineering.make_features(df=input_data, date_col="date")
 
-    # 特徴量名がある場合、その順序に合わせる
-    if feature_names and len(feature_names) > 0:
+    # エンコーダー適用（存在する場合のみ）
+    if encoders_dict:
+        input_data = apply_encoders(input_data, encoders_dict)
+
+    # 学習時のカラム順序に合わせる
+    if feature_names:
         # 特徴量名と入力データの列名の交差部分を取得
         common_columns = [col for col in feature_names if col in input_data.columns]
         if common_columns:
             input_data = input_data[common_columns]
-            logger.info(f"Aligned data to match feature names: {common_columns}")
 
-    # エンコーダーを適用
-    if encoders:
-        input_data = apply_encoders(input_data, encoders)
-
-    logger.info(f"Making prediction with input shape: {input_data.shape}")
     return model.predict(input_data.values)
 
 
 def output_fn(prediction: np.ndarray, accept: str) -> Union[str, bytes]:
-    """
-    モデルの予測結果をレスポンスに変換する関数
+    """モデルの予測結果をレスポンスに変換する関数
 
     Args:
         prediction (np.ndarray): モデルの予測結果
-        accept (str): クライアントが受け入れるレスポンス形式
+        accept (str): 受け入れるレスポンス形式
 
     Returns:
         Union[str, bytes]: フォーマットされた予測結果
@@ -156,7 +196,6 @@ def output_fn(prediction: np.ndarray, accept: str) -> Union[str, bytes]:
     Raises:
         ValueError: サポートされていないレスポンス形式の場合
     """
-    logger.info(f"Formatting output with accept type: {accept}")
 
     if accept == "application/json":
         # 予測結果をJSONに変換
