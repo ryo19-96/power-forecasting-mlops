@@ -73,14 +73,13 @@ def load_data(file_path: str) -> pd.DataFrame:
 class FeatureEngineering:
     """特徴量エンジニアリングを行うクラス"""
 
-    def __init__(self, config: Union[DictConfig, None] = None) -> None:
+    def __init__(self, config: DictConfig = None) -> None:
         """
         Args:
-            config: 設定情報（省略可能）
+            config (DictConfig): 設定情報（省略可能）
         """
         self.config = config
         self.jp_holidays = holidays.Japan()  # type: ignore[attr-defined]
-        # 閾値をconfigから取得
         thresholds = self.config.get("feature_thresholds")
         self.hot_day_threshold = thresholds.get("hot_day")
         self.cold_day_threshold = thresholds.get("cold_day")
@@ -262,11 +261,17 @@ class FeatureEngineering:
         self._encoders_dict = encoders_dict
         return result_df, encoders_dict
 
-    def make_features(self, df: pd.DataFrame, date_col: str = "date") -> Tuple[pd.DataFrame, Dict[str, FeatureEncoder]]:
-        """データフレーム全体に対して特徴量を作成する
+    def make_features(
+        self,
+        df: pd.DataFrame,
+        date_col: str = "date",
+    ) -> pd.DataFrame:
+        """
+        データフレーム全体に対して特徴量を作成する
 
         Args:
-            df: 入力データフレーム
+            df (pd.DataFrame): 入力データフレーム
+            date_col (str): 日付カラム名
 
         Returns:
             pd.DataFrame: 特徴量を追加したデータフレーム
@@ -279,13 +284,18 @@ class FeatureEngineering:
 
         # カレンダー特徴量作成
         df = self.create_calendar_features(df, date_col=date_col)
+        return df
 
-        # configでエンコーダーの指定があればエンコーダーを適用
+    def apply_encoders(self, df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+        """エンコーダーを適用する
+
+        Returns:
+            tuple[pd.DataFrame, dict]: エンコード後データフレームとエンコーダー辞書
+        """
         if self.config and "encoders" in self.config:
             df, encoders_dict = self.encode_features(df, self.config)
         else:
             encoders_dict = {}
-
         return df, encoders_dict
 
 
@@ -386,7 +396,11 @@ if __name__ == "__main__":
     data = load_data(input_path)
     feature_engineering = FeatureEngineering(config=config)
     # データの前処理
-    processed_data, encoders_dict = feature_engineering.make_features(data)
+    processed_data = feature_engineering.make_features(data)
+    # エンコーダーの適用
+    processed_data, encoders_dict = feature_engineering.apply_encoders(processed_data)
+
+    # データ分割
     train_data, test_data = train_test_split(processed_data, test_date="2024-10-01")
     # カラム名を保存
     save_column_names(train_data, output_path=f"{base_dir}/train/features.txt")
