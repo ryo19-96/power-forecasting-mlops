@@ -21,14 +21,13 @@ resource "aws_iam_policy" "succeeded_deploy_policy" {
     Statement : [
       {
         Effect : "Allow",
-        Action : ["ssm:PutParameter"],
+        Action : [
+          "ssm:PutParameter",
+          "ssm:GetParameter",
+          "sagemaker:DescribeEndpoint"
+        ],
         Resource : "*"
       },
-      {
-        Effect : "Allow",
-        Action : ["sagemaker:DescribePipelineExecution"],
-        Resource : "*"
-      }
     ]
   })
 }

@@ -64,27 +64,26 @@ resource "aws_lambda_permission" "allow_eventbridge_deploy_lambda" {
   source_arn    = aws_cloudwatch_event_rule.when_model_approved.arn
 }
 
-# === pipelineが"Succeeded"になったときに、Lambdaを呼び出すEventBridgeの設定 ===
+# === deployで成功したときに、Lambdaを呼び出すEventBridgeの設定 ===
 variable "lambda_succeeded_deploy_function" {
   type = object({
     arn           = string
     function_name = string
   })
 }
-resource "aws_cloudwatch_event_rule" "pipeline_succeeded" {
-  name = "pipeline-succeeded-rule"
+resource "aws_cloudwatch_event_rule" "deploy_succeeded" {
+  name = "deploy-succeeded-rule"
   event_pattern = jsonencode({
-    source        = ["aws.sagemaker"],
-    "detail-type" = ["SageMaker Pipeline Execution Status Change"],
-    detail = {
-      PipelineExecutionStatus = ["Succeeded"],
-      PipelineName            = ["PowerForecastDeploymentPipeline"]
+    "source"      = ["aws.sagemaker"],
+    "detail-type" = ["SageMaker Endpoint State Change"],
+    "detail" = {
+      "EndpointStatus" : ["IN_SERVICE"]
     }
   })
 }
 
 resource "aws_cloudwatch_event_target" "result_lambda_target" {
-  rule = aws_cloudwatch_event_rule.pipeline_succeeded.name
+  rule = aws_cloudwatch_event_rule.deploy_succeeded.name
   arn  = var.lambda_succeeded_deploy_function.arn
 }
 
@@ -92,7 +91,7 @@ resource "aws_lambda_permission" "allow_eventbridge_invoke" {
   action        = "lambda:InvokeFunction"
   function_name = var.lambda_succeeded_deploy_function.function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.pipeline_succeeded.arn
+  source_arn    = aws_cloudwatch_event_rule.deploy_succeeded.arn
 }
 
 

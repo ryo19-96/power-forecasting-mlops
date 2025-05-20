@@ -10,14 +10,14 @@ ssm_client = boto3.client("ssm")
 
 
 def lambda_handler(event, _) -> Dict[str, str]:
-    exec_arn = event["detail"]["PipelineExecutionArn"]
+    # endpointの名前を取得
+    detail = event["detail"]
+    endpoint = detail["EndpointName"]
 
-    # pipeline実行のパラメータから、保存したい"ModelPackageArn"、"EndpointName"を取得
-    response = sagemaker_client.describe_pipeline_execution(PipelineExecutionArn=exec_arn)
-    parameters = {i["Name"]: i["Value"] for i in response["PipelineParameters"]}
-
-    arn = parameters["ModelPackageArn"]
-    endpoint = parameters["EndpointName"]
+    # parameter storeの /approved を取得
+    arn = ssm_client.get_parameter(Name=f"/power-forecasting/{ENV}/sagemaker/model-registry/approved")["Parameter"][
+        "Value"
+    ]
 
     # 結果の保存
     ssm_client.put_parameter(

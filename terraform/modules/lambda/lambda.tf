@@ -52,12 +52,13 @@ resource "aws_lambda_function" "approve_model_lambda" {
   source_code_hash = filebase64sha256("../lambda/approved_model.zip")
   handler          = "approved_model.lambda_handler"
   runtime          = "python3.10"
+  timeout          = 15
   role             = var.lambda_approve_model_role_arn
   environment {
     variables = {
-      SAGEMAKER_ROLE = var.pipeline_exec_role_arn
-      PIPELINE_NAME  = "PowerForecastDeploymentPipeline"
-      ENV            = "${terraform.workspace}"
+      SAGEMAKER_ROLE  = var.pipeline_exec_role_arn
+      DEPLOY_PIPELINE = "PowerForecastDeploymentPipeline"
+      ENV             = "${terraform.workspace}"
     }
   }
 }
@@ -75,11 +76,13 @@ variable "lambda_succeeded_deploy_role_arn" {
   type = string
 }
 resource "aws_lambda_function" "succeeded_deploy" {
-  function_name = "succeeded-deploy-lambda"
-  filename      = "../lambda/succeeded_deploy.zip"
-  handler       = "succeeded_deploy.lambda_handler"
-  runtime       = "python3.10"
-  role          = var.lambda_succeeded_deploy_role_arn
+  function_name    = "succeeded-deploy-lambda"
+  filename         = "../lambda/succeeded_deploy.zip"
+  source_code_hash = filebase64sha256("../lambda/succeeded_deploy.zip")
+  handler          = "succeeded_deploy.lambda_handler"
+  runtime          = "python3.10"
+  timeout          = 6
+  role             = var.lambda_succeeded_deploy_role_arn
   environment {
     variables = {
       ENV = "${terraform.workspace}"
