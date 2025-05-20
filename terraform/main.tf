@@ -35,8 +35,7 @@ module "api_gateway" {
 }
 
 module "eventbridge" {
-  source              = "./modules/eventbridge"
-  aws_lambda_function = module.lambda.send_approval_email_lambda
-  # lambda_model_approved_function   = module.lambda.approve_model_lambda
+  source                           = "./modules/eventbridge"
+  aws_lambda_function              = module.lambda.send_approval_email_lambda
   lambda_succeeded_deploy_function = module.lambda.succeeded_deploy_lambda
 }
