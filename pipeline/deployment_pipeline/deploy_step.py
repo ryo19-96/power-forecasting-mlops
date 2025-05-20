@@ -1,8 +1,12 @@
 import os
-import time
+from datetime import datetime
 
 import boto3
+import pytz
 from botocore.exceptions import ClientError
+
+jst_now = datetime.now(pytz.timezone("Asia/Tokyo"))
+timestamp_str = jst_now.strftime("%Y%m%d-%H%M%S")
 
 REGION = os.environ.get("REGION", "ap-northeast-1")
 ROLE = os.environ["DEPLOYMENT_ROLE"]
@@ -27,7 +31,7 @@ def lambda_handler(event, _) -> None:
 
     # モデルを作成
     # エンドポイントが使うmodel名
-    model_name = f"{endpoint_name}-{int(time.time())}"
+    model_name = f"{endpoint_name}-{timestamp_str}"
     sagemaker_client.create_model(
         ModelName=model_name,
         ExecutionRoleArn=ROLE,
@@ -35,7 +39,7 @@ def lambda_handler(event, _) -> None:
     )
 
     # エンドポイント設定
-    config_name = f"{endpoint_name}-config-{int(time.time())}"
+    config_name = f"{endpoint_name}-config-{timestamp_str}"
     sagemaker_client.create_endpoint_config(
         EndpointConfigName=config_name,
         ProductionVariants=[

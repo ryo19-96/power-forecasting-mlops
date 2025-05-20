@@ -20,13 +20,16 @@ resource "aws_apigatewayv2_api" "approve_api" {
 resource "aws_apigatewayv2_integration" "approve_lambda_integration" {
   api_id = aws_apigatewayv2_api.approve_api.id
   # Lambdaを直接呼び出すプロキシモード
-  integration_type = "AWS_PROXY"
-  integration_uri  = var.aws_lambda_function.invoke_arn
+  integration_type       = "AWS_PROXY"
+  integration_uri        = var.aws_lambda_function.invoke_arn
+  integration_method     = "POST"
+  payload_format_version = "2.0"
 }
 # エンドポイントのルートを設定
 resource "aws_apigatewayv2_route" "approve_route" {
-  api_id    = aws_apigatewayv2_api.approve_api.id
-  route_key = "GET /approve" # /approve に GET でアクセスされたら実行
+  api_id = aws_apigatewayv2_api.approve_api.id
+  # GETメソッドで/approveにアクセスしたときに呼び出す
+  route_key = "GET /approve"
   target    = "integrations/${aws_apigatewayv2_integration.approve_lambda_integration.id}"
 }
 

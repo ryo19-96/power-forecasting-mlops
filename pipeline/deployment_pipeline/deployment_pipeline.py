@@ -80,7 +80,7 @@ endpoint_name = ParameterString("EndpointName", default_value="power-forecast-se
 
 deploy_lambda = Lambda(
     function_name="deploy-step",
-    script="deploy_step.py",
+    zipped_code_dir="deploy_step.zip",
     handler="deploy_step.lambda_handler",
     execution_role_arn=role,
     # TODO: 以下の渡し方だとエラーは出ないが、Lambdaの環境変数に渡せてない。今回はコンソール上から追加した
