@@ -76,7 +76,7 @@ variable "lambda_succeeded_deploy_role_arn" {
   type = string
 }
 resource "aws_lambda_function" "succeeded_deploy" {
-  function_name    = "succeeded-deploy-lambda"
+  function_name    = "succeeded-deploy-lambda-${terraform.workspace}"
   filename         = "../lambda/succeeded_deploy.zip"
   source_code_hash = filebase64sha256("../lambda/succeeded_deploy.zip")
   handler          = "succeeded_deploy.lambda_handler"

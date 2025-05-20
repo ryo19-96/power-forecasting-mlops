@@ -45,7 +45,7 @@ def lambda_handler(event: Dict[str, Any], _) -> None:
 
     # モデルのデプロイ（既に同じモデルがデプロイされていればskip）
     try:
-        prev = ssm_client.get_parameter(Name="/power-forecasting/{ENV}/sagemaker/deploy/last_deployed")["Parameter"][
+        prev = ssm_client.get_parameter(Name=f"/power-forecasting/{ENV}/sagemaker/deploy/last_deployed")["Parameter"][
             "Value"
         ]
     except Exception:
