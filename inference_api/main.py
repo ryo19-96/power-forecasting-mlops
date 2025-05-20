@@ -8,7 +8,7 @@ from inference_api.schemas import PredictRequest, PredictResponse
 
 app = FastAPI(title="Power Forecast Proxy")
 
-# 実行前にエンドポイント名とリージョンをセット
+# エンドポイント名とリージョンを環境変数から読み込む
 ENDPOINT_NAME = os.getenv("SAGEMAKER_ENDPOINT_NAME", "endpoint-name")
 REGION = os.getenv("AWS_REGION", "ap-northeast-1")
 runtime_client = boto3.client("sagemaker-runtime", region_name=REGION)
@@ -24,7 +24,7 @@ def predict(request: PredictRequest) -> PredictResponse:
             ContentType="application/json",
             Body=json.dumps(payload),
         )
-        result = json.loads(response["Body"].read())
+        result = json.loads(response["Body"].read().decode("utf-8"))
         return PredictResponse(predictions=result["predictions"])
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

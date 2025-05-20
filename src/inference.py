@@ -102,9 +102,28 @@ def astype_df(df: pd.DataFrame) -> pd.DataFrame:
 
 def input_fn(request_body: Union[str, bytes], request_content_type: str) -> pd.DataFrame:
     """
-    リクエストボディを DataFrame に変換して返す
+    推論APIに送信されたリクエストのContent-Typeに応じて、入力データ（CSVやJSONなど）をDataFrameへ変換する
+    変換時にカラム名やデータ型（日付・数値・カテゴリなど）を設定される
+    想定していないリクエスト形式だとエラーになる
+
+    Args:
+        request_body (Union[str, bytes]): リクエストボディ。CSVやJSON形式の文字列またはバイト列。
+        request_content_type (str): リクエストのContent-Type（例: 'text/csv', 'application/json' など）
+
+    Returns:
+        pd.DataFrame: Content-Typeに応じて変換されたデータフレーム。
+            - カラム: ['date', 'max_temp', 'min_temp', 'weather']
+            - 'date'はdatetime型、'max_temp'と'min_temp'はfloat型、'weather'はstr型に変換される
+
+    Raises:
+        ValueError: サポートされていないContent-Typeの場合
+
+    Examples:
+        # CSVリクエスト例
+        input_fn('2024-05-21,25.0,15.0,晴れ', 'text/csv')
+        # JSONリクエスト例
+        input_fn('{"date": "2024-05-21", "max_temp": 25.0, "min_temp": 15.0, "weather": "晴れ"}', 'application/json')
     """
-    logger.info(f"Received request with content type: {request_content_type}")
 
     COLUMNS = ["date", "max_temp", "min_temp", "weather"]
 
