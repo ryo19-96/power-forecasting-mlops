@@ -7,8 +7,9 @@ import json
 import logging
 import os
 import pickle
+from io import StringIO
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any, Dict, Tuple, Union
 
 import joblib
 import numpy as np
@@ -35,7 +36,7 @@ def model_fn(model_dir: str) -> Dict[str, Any]:
     model = joblib.load(model_path)
 
     # config.yaml の読み込み
-    config_path = os.path.join(model_dir, "config.yaml")
+    config_path = os.path.join(model_dir, "code", "config.yaml")
     config = load_config(config_path)
 
     # エンコーダーの読み込み（存在する場合）
@@ -100,51 +101,52 @@ def astype_df(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def input_fn(request_body: Union[str, bytes], request_content_type: str) -> pd.DataFrame:
-    """リクエストのボディをpythonオブジェクトに変換するしてデータフレームで返す関数
+    """
+    推論APIに送信されたリクエストのContent-Typeに応じて、入力データ（CSVやJSONなど）をDataFrameへ変換する
+    変換時にカラム名やデータ型（日付・数値・カテゴリなど）を設定される
+    想定していないリクエスト形式だとエラーになる
 
     Args:
-        request_body (Union[str, bytes]): リクエストボディ
-        request_content_type (str): リクエストのコンテンツタイプ
+        request_body (Union[str, bytes]): リクエストボディ。CSVやJSON形式の文字列またはバイト列。
+        request_content_type (str): リクエストのContent-Type（例: 'text/csv', 'application/json' など）
 
     Returns:
-        pd.DataFrame: モデルへの入力データ（データフレーム形式）
+        pd.DataFrame: Content-Typeに応じて変換されたデータフレーム。
+            - カラム: ['date', 'max_temp', 'min_temp', 'weather']
+            - 'date'はdatetime型、'max_temp'と'min_temp'はfloat型、'weather'はstr型に変換される
 
     Raises:
-        ValueError: サポートされていないコンテンツタイプの場合
+        ValueError: サポートされていないContent-Typeの場合
+
+    Examples:
+        # CSVリクエスト例
+        input_fn('2024-05-21,25.0,15.0,晴れ', 'text/csv')
+        # JSONリクエスト例
+        input_fn('{"date": "2024-05-21", "max_temp": 25.0, "min_temp": 15.0, "weather": "晴れ"}', 'application/json')
     """
-    logger.info(f"Received request with content type: {request_content_type}")
 
-    columns_name = ["date", "max_temp", "min_temp", "weather"]
+    COLUMNS = ["date", "max_temp", "min_temp", "weather"]
 
-    # CSVデータをデータフレームに変換
-    if request_content_type == "text/csv":
-        df = pd.read_csv(
-            pd.io.common.StringIO(request_body),
-            header=None,  # ヘッダーなしを想定している
-            names=columns_name,
-        )
+    # text/csv なら CSV 文字列→DataFrame
+    if request_content_type.startswith("text/csv"):
+        df = pd.read_csv(StringIO(request_body), header=None, names=COLUMNS)
         return astype_df(df)
 
-    # JSONデータをデータフレームに変換
-    if request_content_type == "application/json":
-        data = json.loads(request_body)
+    # application/json 系
+    if request_content_type.startswith("application/json"):
+        payload = json.loads(request_body)
 
         # [{...}, {...}] 形式
-        if isinstance(data, list) and isinstance(data[0], dict):
-            df = pd.DataFrame(data)[columns_name]
-            return astype_df(df)
+        if isinstance(payload, list) and payload and isinstance(payload[0], dict):
+            return astype_df(pd.DataFrame(payload)[COLUMNS])
 
-        # {"feature1": 23.4, ...} 形式
-        if isinstance(data, dict) and "features" not in data:
-            # 特徴量名がある場合、その順序に合わせる
-            df = pd.DataFrame([data])[columns_name]
-            return astype_df(df)
+        # {"feature": val, ...} 単一レコード形式
+        if isinstance(payload, dict) and "features" not in payload:
+            return astype_df(pd.DataFrame([payload])[COLUMNS])
 
-        # {"feature1": [[...]]} 形式
-        if isinstance(data, dict) and "features" in data:
-            df = pd.DataFrame(data["features"], columns=columns_name)
-            return astype_df(df)
-
+        # {"features": [[...]]} 形式
+        if isinstance(payload, dict) and "features" in payload:
+            return astype_df(pd.DataFrame(payload["features"], columns=COLUMNS))
     msg = f"Unsupported content type: {request_content_type}"
     raise ValueError(msg)
 
@@ -183,28 +185,24 @@ def predict_fn(input_data: pd.DataFrame, model_dict: Dict[str, Any]) -> np.ndarr
     return model.predict(input_data.values)
 
 
-def output_fn(prediction: np.ndarray, accept: str) -> Union[str, bytes]:
-    """モデルの予測結果をレスポンスに変換する関数
-
-    Args:
-        prediction (np.ndarray): モデルの予測結果
-        accept (str): 受け入れるレスポンス形式
-
-    Returns:
-        Union[str, bytes]: フォーマットされた予測結果
-
-    Raises:
-        ValueError: サポートされていないレスポンス形式の場合
+def output_fn(prediction: np.ndarray, accept: str) -> Tuple[Union[str, bytes], str]:
     """
+    推論結果を (body, content_type) で返す
+    SageMaker で正しく Content-Type を伝えるために必須
+    """
+    # 期待されるレスポンス形式が JSON 系か、あるいは空なら JSON で返す
+    if not accept or accept.startswith("application/json"):
+        body = json.dumps({"predictions": prediction.tolist()})
+        content_type = "application/json"
+        return body, content_type
 
-    if accept == "application/json":
-        # 予測結果をJSONに変換
-        response = json.dumps({"predictions": prediction.tolist()})
-        return response
-    if accept == "text/csv":
-        # 予測結果をCSVに変換
-        response = pd.DataFrame(prediction).to_csv(header=False, index=False)
-        return response
-    # デフォルトはJSON
-    response = json.dumps({"predictions": prediction.tolist()})
-    return response
+    # CSV を要求された場合
+    if accept.startswith("text/csv"):
+        body = pd.DataFrame(prediction).to_csv(header=False, index=False)
+        content_type = "text/csv"
+        return body, content_type
+
+    # それ以外はすべて JSON で対応
+    body = json.dumps({"predictions": prediction.tolist()})
+    content_type = "application/json"
+    return body, content_type

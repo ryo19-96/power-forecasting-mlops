@@ -292,10 +292,16 @@ class FeatureEngineering:
         Returns:
             Tuple[pd.DataFrame, dict]: エンコード後データフレームとエンコーダー辞書
         """
+        # 目的変数を一時的に除外
+        target_col = "max_power"
+        y = df.pop(target_col) if target_col in df.columns else None
         if self.config and "encoders" in self.config:
             df, encoders_dict = self.encode_features(df, self.config)
         else:
             encoders_dict = {}
+        # 目的変数を先頭に戻す
+        if y is not None:
+            df = pd.concat([y, df], axis=1)
         return df, encoders_dict
 
 

@@ -1,6 +1,6 @@
-numpy==1.19.5
-pandas==1.1.3
+numpy==1.24.1
+pandas==1.1.3 
 joblib
-lightgbm
+lightgbm==4.0.0
 category_encoders
 omegaconf
