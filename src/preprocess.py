@@ -286,11 +286,11 @@ class FeatureEngineering:
         df = self.create_calendar_features(df, date_col=date_col)
         return df
 
-    def apply_encoders(self, df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    def apply_encoders(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, dict]:
         """エンコーダーを適用する
 
         Returns:
-            tuple[pd.DataFrame, dict]: エンコード後データフレームとエンコーダー辞書
+            Tuple[pd.DataFrame, dict]: エンコード後データフレームとエンコーダー辞書
         """
         if self.config and "encoders" in self.config:
             df, encoders_dict = self.encode_features(df, self.config)
