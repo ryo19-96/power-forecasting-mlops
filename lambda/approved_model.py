@@ -4,6 +4,10 @@ import urllib.parse
 from typing import Any, Dict
 
 import boto3
+import logging
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 ROLE = os.environ["SAGEMAKER_ROLE"]
 ENV = os.environ.get("ENV", "dev")
@@ -50,6 +54,9 @@ def lambda_handler(event: Dict[str, Any], _) -> None:
         ]
     except Exception:
         prev = None
+
+    logger.info(f"Previous deployed model: {prev}")
+    logger.info(f"New model to deploy: {package_arn}")
 
     if prev == package_arn:
         return {"statusCode": 200, "body": "Model already deployed. Skipping deployment."}

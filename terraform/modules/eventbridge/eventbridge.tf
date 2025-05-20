@@ -34,35 +34,35 @@ resource "aws_lambda_permission" "allow_eventbridge" {
 }
 
 # === メール承認によってApprovalされたときに、Lambdaを呼び出すEventBridgeの設定 ===
-variable "lambda_model_approved_function" {
-  type = object({
-    arn           = string
-    function_name = string
-  })
-}
-resource "aws_cloudwatch_event_rule" "when_model_approved" {
-  name = "model-approved-trigger-deploy"
-  event_pattern = jsonencode({
-    "source" : ["aws.sagemaker"],
-    "detail-type" : ["SageMaker Model Package State Change"],
-    "detail" : {
-      "ModelApprovalStatus" : ["Approved"],
-      "ModelPackageGroupName" : ["PowerForecastPackageGroup"]
-    }
-  })
-}
+# variable "lambda_model_approved_function" {
+#   type = object({
+#     arn           = string
+#     function_name = string
+#   })
+# }
+# resource "aws_cloudwatch_event_rule" "when_model_approved" {
+#   name = "model-approved-trigger-deploy"
+#   event_pattern = jsonencode({
+#     "source" : ["aws.sagemaker"],
+#     "detail-type" : ["SageMaker Model Package State Change"],
+#     "detail" : {
+#       "ModelApprovalStatus" : ["Approved"],
+#       "ModelPackageGroupName" : ["PowerForecastPackageGroup"]
+#     }
+#   })
+# }
 
-resource "aws_cloudwatch_event_target" "deploy_target" {
-  rule = aws_cloudwatch_event_rule.when_model_approved.name
-  arn  = var.lambda_model_approved_function.arn
-}
+# resource "aws_cloudwatch_event_target" "deploy_target" {
+#   rule = aws_cloudwatch_event_rule.when_model_approved.name
+#   arn  = var.lambda_model_approved_function.arn
+# }
 
-resource "aws_lambda_permission" "allow_eventbridge_deploy_lambda" {
-  action        = "lambda:InvokeFunction"
-  function_name = var.lambda_model_approved_function.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.when_model_approved.arn
-}
+# resource "aws_lambda_permission" "allow_eventbridge_deploy_lambda" {
+#   action        = "lambda:InvokeFunction"
+#   function_name = var.lambda_model_approved_function.function_name
+#   principal     = "events.amazonaws.com"
+#   source_arn    = aws_cloudwatch_event_rule.when_model_approved.arn
+# }
 
 # === deployで成功したときに、Lambdaを呼び出すEventBridgeの設定 ===
 variable "lambda_succeeded_deploy_function" {
