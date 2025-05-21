@@ -2,9 +2,7 @@
 name = "power-forecasting-mlops"
 version = "0.1.0"
 description = ""
-authors = [
-    {name = "Ryo Watanabe",email = "ryopoaro03290024@gmail.com"}
-]
+authors = []
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -24,6 +22,9 @@ dependencies = [
     "fastapi (>=0.115.12,<0.116.0)",
     "uvicorn (>=0.34.2,<0.35.0)"
 ]
+
+[tool.poetry]
+package-mode = false
 
 
 [build-system]
