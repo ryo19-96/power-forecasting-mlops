@@ -154,10 +154,57 @@ package/ライブラリ のようにライブラリが入っているとエラ�
 
 - 予測値を取得してみたい
 事前にmodel_pipelineを実行 -> メール承認 まで行いserverless inferenceにデプロイしてエンドポイントが作成されていることを確認してください。  
+環境変数`ENDPOINT_NAME`にエンドポイント名を追加して適用してください。
+確認後以下を実行
 ```sh
 make run_api
 ```
+コンソールに表示される`http://127.0.0.1:8000` に /docs を追加した `http://127.0.0.1:8000/docs` にアクセスする。  
+![alt text](api_image1.png)
 
+`post /predict`をクリックし、右にある`Try it out`をクリック  
+Request body にはデフォルト値が入っているのでそのまま`Execute`をクリック
+
+![alt text](api_image2.png)
+
+Response が表示されpredictionsに予測値が入っていれば成功です。
+今回デプロイしている serverless inference は常時稼働しているわけではないコールドスタートなので初回は時間がかかります。  
+
+![alt text](api_image3.png)
+
+### APIエンドポイントの詳細
+
+#### POST /predict
+電力需要を予測するエンドポイント
+
+**リクエスト本文**:
+```json
+{
+  "date": "2025-05-20",
+  "max_temp": 28,
+  "min_temp": 10.5,
+  "weather": "曇り"
+}
+```
+
+**パラメータ説明**:
+- `date`: 予測する日付（YYYY-MM-DD形式）
+- `max_temp`: 最高気温（℃）
+- `min_temp`: 最低気温（℃）
+- `weather`: 天気
+
+**レスポンス**:
+```json
+{
+    "body": {
+        "predictions": [
+            3363.476878359826
+        ]
+    },
+    "contentType": "application/json",
+    "invokedProductionVariant": "AllTraffic"
+}
+```
 
 
 ## 出力例
@@ -186,5 +233,26 @@ make run_api
 ### 4. 環境分離
 - dev/prod などの環境ごとにバケット・エンドポイントを切り替える仕組みの導入する
 
+### 5. CI/CD パイプラインの拡張
+- 本番環境へのデプロイ自動化
+
+
+---
+
+## makeコマンド一覧
+
+| コマンド               | 説明                           | 使用例                                |
+| :--------------------- | :----------------------------- | :------------------------------------ |
+| `make lint`            | Ruffを使用してコードをチェック | `make lint`                           |
+| `make fmt`             | Ruffを使用してコードを自動整形 | `make fmt`                            |
+| `make all`             | fmt と lint を順に実行         | `make all`                            |
+| `make model_pipeline`  | モデルパイプラインを実行       | `make model_pipeline`                 |
+| `make deploy_pipeline` | デプロイパイプラインを更新     | `make deploy_pipeline`                |
+| `make zip_lambda`      | Lambdaのコードをzip化          | `make zip_lambda file=approved_model` |
+| `make run_api`         | 推論APIをローカルで実行        | `make run_api`                        |
+
+## ライセンス
+
+このプロジェクトは[Apache 2.0](LICENSE)の下で公開されています。
 
 ---
