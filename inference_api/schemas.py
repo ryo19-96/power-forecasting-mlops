@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 
 class PredictRequest(BaseModel):
-    date: str = Field(example="2023-01-01")
+    date: str = Field(example="2025-05-20")
     max_temp: float = Field(example=28.0)
     min_temp: float = Field(example=10.5)
     weather: str = Field(example="曇り")
