@@ -1,5 +1,5 @@
-# Ruff を動作させる
-.PHONY: lint format all
+.PHONY: lint fmt all zip_lambda model_pipeline deploy_pipeline
+# === Ruff ===
 
 lint:
 	poetry run ruff check
@@ -9,17 +9,18 @@ fmt:
 
 all: fmt lint
 
-# Terraform をルートディレクトリから動作させる
-TF_DIR=terraform
+# === Pipeline ===
+model_pipeline:
+	poetry run python pipeline/model_pipeline/run_pipeline.py
 
-init:
-	terraform -chdir=$(TF_DIR) init
+deploy_pipeline:
+	poetry run python pipeline/deployment_pipeline/deployment_pipeline.py
 
-plan:
-	terraform -chdir=$(TF_DIR) plan
-
-apply:
-	terraform -chdir=$(TF_DIR) apply
-# brew install graphviz でインストールが必要(macOS)
-graph:
-	terraform -chdir=$(TF_DIR) graph | dot -Tpng > terraform_graph.png
+# === zip ===
+zip_lambda:
+	@if [ -z "$(file)" ]; then \
+		echo "use to: make zip_lambda file=file_name (拡張子なし)"; \
+		exit 1; \
+	fi
+	cd lambda && zip -j $(file).zip $(file).py
+	@echo "completed $(file).zip"
