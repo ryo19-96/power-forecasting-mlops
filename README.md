@@ -71,17 +71,18 @@ MLOpsの学習および実践を目的として、気象データと過去の電
 :warning:  以下は macOS を前提に書いています。
 ```
 
-1. aws cli のインストール & configure に `access_key` と `secret_key` を設定
+1. aws cli のインストール & configure に `access_key` と `secret_key` を設定  
  - 参考；https://zenn.dev/akkie1030/articles/aws-cli-setup-tutorial
 
-2. terraform のインストール
+2. terraform のインストール  
  - 参考：https://zenn.dev/take_tech/articles/32188cd3607721
 
-3. 依存パッケージのインストール
+3. 依存パッケージのインストール  
+仮想環境化でのインストールを推奨します。
 ```sh
 poetry install
 ```
-4. メール設定
+4. メール設定  
 モデルの承認はメールで承認することでデプロイ処理に進みます。  
 メール送信はawsのSESを使用しているため、事前にコンソール上で設定を行ってください。  
 なお、IDの設定は動作確認のためであればドメイン登録は不要です。eメール設定で自分のアドレスを認証させればサンドボックス環境下でも自分のメールアドレスに届きます。（自分の場合は迷惑メールに入っていました）  
@@ -89,8 +90,7 @@ terraformでも設定できると思いますが、今回はコンソール上�
 参考：
 - (AWS-E メールの認証方法)[https://docs.aws.amazon.com/ja_jp/ses/latest/dg/email-authentication-methods.html]
 - (何もかもわからない人間によるAmazon SESメールのドメイン認証学習記録)[https://qiita.com/ryo_one/items/c0135e43ca809e9f64f2]（もっと知りたい人）
-
-5. terraform の実行
+5. terraform の実行  
 以下コマンドで terraform を適用してください。
 また、workspaceを使用しているのでworkspaceも設定します
 ```sh
@@ -106,9 +106,9 @@ terraform apply # 適用
 
 ## ユースケース
 
-このプロジェクトではmake ファイルを作成していますが、一部対応できていない箇所もあります。  
+このプロジェクトでは make ファイルを作成していますが、一部対応できていない箇所もあります。  
 
-- ruff を実行したい
+### ruff を実行したい
 ```sh
 make lint
 make fmt
@@ -117,20 +117,20 @@ make all # fmt + lint
 上記でそれぞれ実行することができます。  
 デフォルトでfmtを行うことでlintも実行しているっぽいのでfmtだけで十分な気がしています。。
 
-- lambda を追加したいのでzipファイルを追加したい
+### lambda を追加したいのでzipファイルを追加したい
 ```sh
 zip_lambda file={ファイル名} # 拡張子は不要です
 ```
 上記コマンドでlambdaディレクトリにあるpythonファイルを同じディレクトリにzipファイルが作成されます。（ファイル名は同じ）  
 あとはlambda関連の terraform の設定を記述して、apply を実行してください。
 
-- model pipelieを実行したい
+### model pipelieを実行したい
 ```sh
 make model_pipeline
 ```
  -> aws sagemaker コンソールでpipelineが動作していることを確認してください
 
-- deployment pipeline を更新したい
+### deployment pipeline を更新したい
 ```sh
 make deployment_pipeline
 ```
@@ -150,9 +150,9 @@ cd .. && unzip -t deploy_step.zip # zipの中身を確認
 unzipしたときにdeploy_step.pyと各ライブラリが同じディレクトリに入っていればOK。  
 package/ライブラリ のようにライブラリが入っているとエラーになるので注意。
 
-参考：(Python Lambda 関数で .zip ファイルアーカイブを使用する)[https://docs.aws.amazon.com/ja_jp/lambda/latest/dg/python-package.html]
+参考：[PythonLambda関数で.zipファイルアーカイブを使用する](https://docs.aws.amazon.com/ja_jp/lambda/latest/dg/python-package.html)
 
-- 予測値を取得してみたい
+### 予測値を取得してみたい
 事前にmodel_pipelineを実行 -> メール承認 まで行いserverless inferenceにデプロイしてエンドポイントが作成されていることを確認してください。  
 環境変数`ENDPOINT_NAME`にエンドポイント名を追加して適用してください。
 確認後以下を実行
@@ -160,17 +160,17 @@ package/ライブラリ のようにライブラリが入っているとエラ�
 make run_api
 ```
 コンソールに表示される`http://127.0.0.1:8000` に /docs を追加した `http://127.0.0.1:8000/docs` にアクセスする。  
-![alt text](api_image1.png)
+![alt text](image/api_image1.png)
 
 `post /predict`をクリックし、右にある`Try it out`をクリック  
 Request body にはデフォルト値が入っているのでそのまま`Execute`をクリック
 
-![alt text](api_image2.png)
+![alt text](image/api_image2.png)
 
 Response が表示されpredictionsに予測値が入っていれば成功です。
 今回デプロイしている serverless inference は常時稼働しているわけではないコールドスタートなので初回は時間がかかります。  
 
-![alt text](api_image3.png)
+![alt text](image/api_image3.png)
 
 ### APIエンドポイントの詳細
 
@@ -253,6 +253,6 @@ Response が表示されpredictionsに予測値が入っていれば成功です
 
 ## ライセンス
 
-このプロジェクトは[Apache 2.0](LICENSE)の下で公開されています。
+このプロジェクトは[Apache 2.0](LICENSE)の下で公開されています.
 
 ---
