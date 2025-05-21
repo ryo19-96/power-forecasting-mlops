@@ -52,7 +52,6 @@ MLOpsの学習および実践を目的として、気象データと過去の電
 | ディレクトリ/ファイル | 内容                                       |
 | :-------------------- | :----------------------------------------- |
 | `.github/`            | ワークフロー定義（CI）                     |
-| `data/`               | 入力データ（ローカル使用時）               |
 | `inference_api/`      | 推論API                                    |
 | `src/`                | 前処理・学習・評価・推論などのステップ定義 |
 | `pipeline/`           | パイプライン定義・実行                     |
@@ -68,8 +67,6 @@ MLOpsの学習および実践を目的として、気象データと過去の電
 
 | ファイル名                                            | 役割                                      |
 | :---------------------------------------------------- | :---------------------------------------- |
-| `data/weather_data.csv`                               | 気象データ                                |
-| `data/power_usage/`                                   | 月別電力使用量データ                      |
 | `src/preprocess.py`                                   | データ前処理                              |
 | `src/feature_encoder.py`                              | 特徴量エンジニアリング（エンコード）      |
 | `src/evaluate.py`                                     | モデル評価                                |
@@ -79,6 +76,8 @@ MLOpsの学習および実践を目的として、気象データと過去の電
 | `pipeline/model_pipeline/model_pipeline.py`           | モデルパイプライン定義                    |
 | `terraform/`                                          | AWSリソース管理（S3, IAM, EventBridge等） |
 | `lambda/`                                             | Lambda関数                                |
+| `inference_api/`                                      | FastAPIの処理                             |
+
 
 
 
@@ -236,8 +235,6 @@ Response が表示されpredictionsに予測値が入っていれば成功です
 | `feature_importance.png`              | 特徴量重要度グラフ         |
 | `prediction_vs_actual_timeseries.png` | 予測値と実測値の時系列比較 |
 
----
-
 
 ## 今後の展望
 
@@ -259,18 +256,6 @@ Response が表示されpredictionsに予測値が入っていれば成功です
 
 
 ---
-
-## makeコマンド一覧
-
-| コマンド               | 説明                           | 使用例                                |
-| :--------------------- | :----------------------------- | :------------------------------------ |
-| `make lint`            | Ruffを使用してコードをチェック | `make lint`                           |
-| `make fmt`             | Ruffを使用してコードを自動整形 | `make fmt`                            |
-| `make all`             | fmt と lint を順に実行         | `make all`                            |
-| `make model_pipeline`  | モデルパイプラインを実行       | `make model_pipeline`                 |
-| `make deploy_pipeline` | デプロイパイプラインを更新     | `make deploy_pipeline`                |
-| `make zip_lambda`      | Lambdaのコードをzip化          | `make zip_lambda file=approved_model` |
-| `make run_api`         | 推論APIをローカルで実行        | `make run_api`                        |
 
 ## ライセンス
 
