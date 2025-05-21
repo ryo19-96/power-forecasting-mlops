@@ -19,7 +19,7 @@ deploy_pipeline:
 # === zip ===
 zip_lambda:
 	@if [ -z "$(file)" ]; then \
-		echo "use to: make zip_lambda file=file_name (拡張子なし)"; \
+		echo "Usage: make zip_lambda file=file_name (without extension)"; \
 		exit 1; \
 	fi
 	cd lambda && zip -j $(file).zip $(file).py
