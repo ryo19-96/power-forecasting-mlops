@@ -1,4 +1,4 @@
-.PHONY: lint fmt all zip_lambda model_pipeline deploy_pipeline
+.PHONY: lint fmt all zip_lambda model_pipeline deploy_pipeline run_api
 # === Ruff ===
 
 lint:
@@ -24,3 +24,7 @@ zip_lambda:
 	fi
 	cd lambda && zip -j $(file).zip $(file).py
 	@echo "completed $(file).zip"
+
+# === API ===
+run_api:
+	poetry run uvicorn inference_api.main:app --reload --port 8000
