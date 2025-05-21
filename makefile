@@ -1,5 +1,5 @@
-# Ruff を動作させる
-.PHONY: lint format all
+.PHONY: lint fmt all zip_lambda model_pipeline deploy_pipeline run_api
+# === Ruff ===
 
 lint:
 	poetry run ruff check
@@ -9,17 +9,22 @@ fmt:
 
 all: fmt lint
 
-# Terraform をルートディレクトリから動作させる
-TF_DIR=terraform
+# === Pipeline ===
+model_pipeline:
+	poetry run python pipeline/model_pipeline/run_pipeline.py
 
-init:
-	terraform -chdir=$(TF_DIR) init
+deployment_pipeline:
+	poetry run python pipeline/deployment_pipeline/deployment_pipeline.py
 
-plan:
-	terraform -chdir=$(TF_DIR) plan
+# === zip ===
+zip_lambda:
+	@if [ -z "$(file)" ]; then \
+		echo "Usage: make zip_lambda file=file_name (without extension)"; \
+		exit 1; \
+	fi
+	cd lambda && zip -j $(file).zip $(file).py
+	@echo "completed $(file).zip"
 
-apply:
-	terraform -chdir=$(TF_DIR) apply
-# brew install graphviz でインストールが必要(macOS)
-graph:
-	terraform -chdir=$(TF_DIR) graph | dot -Tpng > terraform_graph.png
+# === API ===
+run_api:
+	poetry run uvicorn inference_api.main:app --reload --port 8000
