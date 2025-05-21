@@ -13,7 +13,7 @@ all: fmt lint
 model_pipeline:
 	poetry run python pipeline/model_pipeline/run_pipeline.py
 
-deploy_pipeline:
+deployment_pipeline:
 	poetry run python pipeline/deployment_pipeline/deployment_pipeline.py
 
 # === zip ===
