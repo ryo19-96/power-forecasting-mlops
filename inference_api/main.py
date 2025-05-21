@@ -19,6 +19,7 @@ runtime_client = boto3.client("sagemaker-runtime", region_name=REGION)
 def predict(request: PredictRequest) -> PredictResponse:
     try:
         payload = request.dict()
+        # HTTPレスポンス
         response = runtime_client.invoke_endpoint(
             EndpointName=ENDPOINT_NAME,
             ContentType="application/json",
