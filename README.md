@@ -72,10 +72,10 @@ MLOpsの学習および実践を目的として、気象データと過去の電
 ```
 
 1. aws cli のインストール & configure に `access_key` と `secret_key` を設定  
- - 参考；https://zenn.dev/akkie1030/articles/aws-cli-setup-tutorial
+ - 参考；[【AWS】aws cliの設定方法](https://zenn.dev/akkie1030/articles/aws-cli-setup-tutorial)
 
 2. terraform のインストール  
- - 参考：https://zenn.dev/take_tech/articles/32188cd3607721
+ - 参考：[最新Mac対応】M1、M2、M3チップでTerraformをわずか3分でインストール！](https://zenn.dev/take_tech/articles/32188cd3607721)
 
 3. 依存パッケージのインストール  
 仮想環境化でのインストールを推奨します。
@@ -88,8 +88,8 @@ poetry install
 なお、IDの設定は動作確認のためであればドメイン登録は不要です。eメール設定で自分のアドレスを認証させればサンドボックス環境下でも自分のメールアドレスに届きます。（自分の場合は迷惑メールに入っていました）  
 terraformでも設定できると思いますが、今回はコンソール上でやってしまいました。。
 参考：
-- (AWS-E メールの認証方法)[https://docs.aws.amazon.com/ja_jp/ses/latest/dg/email-authentication-methods.html]
-- (何もかもわからない人間によるAmazon SESメールのドメイン認証学習記録)[https://qiita.com/ryo_one/items/c0135e43ca809e9f64f2]（もっと知りたい人）
+- [AWS-E メールの認証方法](https://docs.aws.amazon.com/ja_jp/ses/latest/dg/email-authentication-methods.html)
+- [何もかもわからない人間によるAmazon SESメールのドメイン認証学習記録](https://qiita.com/ryo_one/items/c0135e43ca809e9f64f2)（もっと知りたい人）
 5. terraform の実行  
 以下コマンドで terraform を適用してください。
 また、workspaceを使用しているのでworkspaceも設定します
@@ -160,17 +160,17 @@ package/ライブラリ のようにライブラリが入っているとエラ�
 make run_api
 ```
 コンソールに表示される`http://127.0.0.1:8000` に /docs を追加した `http://127.0.0.1:8000/docs` にアクセスする。  
-![alt text](image/api_image1.png)
+![alt text](images/api_image1.png)
 
 `post /predict`をクリックし、右にある`Try it out`をクリック  
 Request body にはデフォルト値が入っているのでそのまま`Execute`をクリック
 
-![alt text](image/api_image2.png)
+![alt text](images/api_image2.png)
 
 Response が表示されpredictionsに予測値が入っていれば成功です。
 今回デプロイしている serverless inference は常時稼働しているわけではないコールドスタートなので初回は時間がかかります。  
 
-![alt text](image/api_image3.png)
+![alt text](images/api_image3.png)
 
 ### APIエンドポイントの詳細
 
@@ -223,7 +223,7 @@ Response が表示されpredictionsに予測値が入っていれば成功です
 ### 1.  監視・通知機能の追加
 - パイプライン失敗時やモデル精度劣化時にSlackで通知
 - モデル精度やデータドリフトの継続的モニタリング（SageMaker Model Monitor）
-- 
+
 ### 2.  コスト最適化（FinOps）
 - S3やログのライフサイクル設定などのストレージコスト最適化
 
