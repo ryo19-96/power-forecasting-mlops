@@ -28,7 +28,7 @@ MLOpsの学習および実践を目的として、気象データと過去の電
 
 ![アーキテクチャ図](images/architecture_diagram_v1.png)
 
-ワークフロー順序
+### ワークフロー詳細
 1. 以下の条件でModel Pilenineが起動します
     - GitHub 上で対象ディレクトリに変更があり、main ブランチへマージされたとき（GitHub Actions 経由）
     - `run_pipeline.py` を手動で実行したとき
