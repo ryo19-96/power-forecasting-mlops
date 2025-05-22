@@ -28,6 +28,24 @@ MLOpsの学習および実践を目的として、気象データと過去の電
 
 ![アーキテクチャ図](images/architecture_diagram_v1.png)
 
+ワークフロー順序
+1. 以下の条件でModel Pilenineが起動します
+    - GitHub 上で対象ディレクトリに変更があり、main ブランチへマージされたとき（GitHub Actions 経由）
+    - `run_pipeline.py` を手動で実行したとき
+2. Model Pipeline が前処理 → 特徴量エンジニアリング → モデル学習 → 評価 → 可視化 → 閾値判定 までを自動で実行します  （各ステップの詳細は[パイプライン詳細](#パイプライン詳細)を参照）
+3. 評価メトリクスが指定閾値を満たしたモデルは、Model Registry に `PendingManualApproval` 状態で登録されます
+4. EventBridge が `PendingManualApproval` のモデル登録イベントを検知し、承認用リンクを含む Eメールを SES 経由で送信する Lambda をトリガーします
+5. 承認者はメール内の `Approve` または `Reject` をクリックします
+6. API Gateway が Lambda を呼び出し、次の処理が行われます
+    - Model Registry 内のステータスを `Approved` または `Rejected` に更新
+    - `Approved` の場合、そのモデルの ARN を Parameter Store に保存
+    - `Approved` の場合、Deployment Pipeline を起動
+7. Deployment Pipeline が `Approved` モデルを Serverless Inference にデプロイします
+8. デプロイ完了後、EventBridge が成功イベントを検知し、Parameter Store に以下を保存します
+    - モデル ARN
+    - エンドポイント名
+9. ユーザーはエンドポイントに対してAPIリクエストを送信し、推論結果を取得することができます
+
 
 
 ## パイプライン詳細
