@@ -223,3 +223,5 @@ _repack_*.*
 package/
 
 data/
+
+spark_deps/

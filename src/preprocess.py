@@ -407,7 +407,7 @@ if __name__ == "__main__":
     processed_data, encoders_dict = feature_engineering.apply_encoders(processed_data)
 
     # データ分割
-    train_data, test_data = train_test_split(processed_data, test_date="2024-10-01")
+    train_data, test_data = train_test_split(processed_data, test_date=feature_engineering.config.get("split_date"))
     # カラム名を保存
     save_column_names(train_data, output_path=f"{base_dir}/train/features.txt")
 

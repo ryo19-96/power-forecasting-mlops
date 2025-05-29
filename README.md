@@ -120,7 +120,7 @@ poetry install
 モデルの承認はメールで承認することでデプロイ処理に進みます。  
 メール送信はawsのSESを使用しているため、事前にコンソール上で設定を行ってください。  
 なお、IDの設定は動作確認のためであればドメイン登録は不要です。eメール設定で自分のアドレスを認証させればサンドボックス環境下でも自分のメールアドレスに届きます。（自分の場合は迷惑メールに入っていました）  
-terraformでも設定できると思いますが、今回はコンソール上でやってしまいました。。
+terraformでも設定できると思いますが、今回はコンソール上でやってしまいました。。  
 参考：
 - [AWS-E メールの認証方法](https://docs.aws.amazon.com/ja_jp/ses/latest/dg/email-authentication-methods.html)
 - [何もかもわからない人間によるAmazon SESメールのドメイン認証学習記録](https://qiita.com/ryo_one/items/c0135e43ca809e9f64f2)（もっと知りたい人）
@@ -142,7 +142,7 @@ terraform apply # 適用
 - `weather_data.csv`
 
 
-## ユースケース
+## makefile ユースケース
 
 このプロジェクトでは make ファイルを作成していますが、一部対応できていない箇所もあります。  
 
@@ -161,6 +161,14 @@ zip_lambda file={ファイル名} # 拡張子は不要です
 ```
 上記コマンドでlambdaディレクトリにあるpythonファイルを同じディレクトリにzipファイルが作成されます。（ファイル名は同じ）  
 あとはlambda関連の terraform の設定を記述して、apply を実行してください。
+
+※ lambdaの中に入っていないライブラリを使用する場合、別途必要なライブラリのみをzipに含める必要があります。以下のようにしてzipファイルにライブラリを含めてください。（最大 50MBの制限があります）
+```sh
+mkdir -p lambda/build
+pip install pandas -t lambda/build # 例としてpandasを入れる
+cd lambda/build
+zip -r ../extract_weather_data.zip . # zipに追加する
+```
 
 ### model pipelieを実行したい
 ```sh
@@ -245,15 +253,6 @@ Response が表示されpredictionsに予測値が入っていれば成功です
 ```
 
 
-## 出力例
-
-| ファイル名                            | 内容例                     |
-| :------------------------------------ | :------------------------- |
-| `model_metrics.png`                   | モデル評価指標の可視化     |
-| `feature_importance.png`              | 特徴量重要度グラフ         |
-| `prediction_vs_actual_timeseries.png` | 予測値と実測値の時系列比較 |
-
-
 ## 今後の展望
 
 ### 1.  監視・通知機能の追加
@@ -273,10 +272,7 @@ Response が表示されpredictionsに予測値が入っていれば成功です
 - 本番環境へのデプロイ自動化
 
 
----
 
 ## ライセンス
 
 このプロジェクトは[Apache 2.0](LICENSE)の下で公開されています.
-
----
