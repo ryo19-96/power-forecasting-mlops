@@ -126,21 +126,6 @@ class DataLoader:
         # dateカラムを使って両方のデータフレームを結合
         return weather_df.merge(power_usage_df, on="date", how="inner")
 
-    def format_target_first(self, df: pd.DataFrame, target_col: str = "max_power") -> pd.DataFrame:
-        """目的変数を明示的に最初のカラムに移動する
-        Args:
-            df: 入力データフレーム
-            target_col: 目的変数のカラム名
-
-        Returns:
-            pd.DataFrame: 目的変数が最初のカラムに移動したデータフレーム
-
-        Notes:
-            awsのビルドインモデルを使用した場合先頭列に目的変数が必要なため列の順番を変更する
-        """
-        y = df.pop(target_col)
-        return pd.concat([y, df], axis=1)
-
 
 if __name__ == "__main__":
     logger.info("Starting load data...")
