@@ -1,0 +1,3 @@
+# Airflow 確認用
+boto3
+apache-airflow

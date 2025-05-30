@@ -33,7 +33,7 @@ def lambda_handler(event, _) -> None:
 
     with zipfile.ZipFile(zip_buffer, "r") as zip_file:
         for filename in zip_file.namelist():
-            # 例: 20221210_power_usage.csv
+            # e.g. 20221210_power_usage.csv
             date_str = filename.split("_")[0]
             year_month = f"{date_str[:4]}-{date_str[4:6]}"
             date_fmt = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}"

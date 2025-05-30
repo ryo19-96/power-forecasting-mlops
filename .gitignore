@@ -225,3 +225,5 @@ package/
 data/
 
 spark_deps/
+
+logs/

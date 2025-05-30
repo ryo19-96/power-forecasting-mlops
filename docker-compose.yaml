@@ -1,0 +1,61 @@
+# ローカルAirflow用
+# docker-composeを使用してAirflowとPostgreSQLをセットアップするための設定ファイル
+version: '3.7' # Docker Composeのバージョン
+
+services:
+    postgres:
+        image: postgres:13
+        environment:
+            POSTGRES_USER: airflow
+            POSTGRES_PASSWORD: airflow
+            POSTGRES_DB: airflow
+        ports:
+            - "5432:5432"
+        # データの永続化を行うための設定 
+        volumes:
+            - postgres-db-volume:/var/lib/postgresql/data
+
+    airflow-webserver:
+        image: apache/airflow:2.7.2
+        depends_on:
+            - postgres
+        env_file:
+            - .env
+        environment:
+            AIRFLOW__CORE__EXECUTOR: LocalExecutor
+            AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+            AIRFLOW__CORE__FERNET_KEY: ""
+            AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+            AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+            AIRFLOW__WEBSERVER__SECRET_KEY: "BvG2wQvWF6Bri5DXEXUfNLRmHUlUHB8fx6KaHJ6ddAk"
+
+        volumes:
+            - ./dags:/opt/airflow/dags
+            - ./requirements.txt:/requirements.txt
+            - ./logs:/opt/airflow/logs
+        ports:
+            - "8080:8080"
+        # 初期化スクリプト
+        # adminユーザの作成と初期化を行う（ログインはadmin/admin）
+        command: bash -c "airflow db init && airflow users create --username admin --password admin --firstname admin --lastname admin --role Admin --email admin@example.com && pip install -r /requirements.txt && airflow webserver"
+
+    airflow-scheduler:
+        image: apache/airflow:2.7.2
+        depends_on:
+            - airflow-webserver
+        env_file:
+            - .env
+        environment:
+            AIRFLOW__CORE__EXECUTOR: LocalExecutor
+            AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+            AIRFLOW__WEBSERVER__SECRET_KEY: "BvG2wQvWF6Bri5DXEXUfNLRmHUlUHB8fx6KaHJ6ddAk"
+        volumes:
+            - ./dags:/opt/airflow/dags
+            - ./requirements.txt:/requirements.txt
+            - ./logs:/opt/airflow/logs
+        # requirements.txtのライブラリをインストールし、スケジューラーを起動
+        command: bash -c "pip install -r /requirements.txt && airflow scheduler"
+
+volumes:
+    postgres-db-volume:
+    logs:

@@ -162,14 +162,6 @@ zip_lambda file={ファイル名} # 拡張子は不要です
 上記コマンドでlambdaディレクトリにあるpythonファイルを同じディレクトリにzipファイルが作成されます。（ファイル名は同じ）  
 あとはlambda関連の terraform の設定を記述して、apply を実行してください。
 
-※ lambdaの中に入っていないライブラリを使用する場合、別途必要なライブラリのみをzipに含める必要があります。以下のようにしてzipファイルにライブラリを含めてください。（最大 50MBの制限があります）
-```sh
-mkdir -p lambda/build
-pip install pandas -t lambda/build # 例としてpandasを入れる
-cd lambda/build
-zip -r ../extract_weather_data.zip . # zipに追加する
-```
-
 ### model pipelieを実行したい
 ```sh
 make model_pipeline

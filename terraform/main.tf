@@ -48,3 +48,20 @@ module "eventbridge" {
 module "dynamodb" {
   source = "./modules/dynamodb"
 }
+
+module "network" {
+  source   = "./modules/network"
+  region   = var.aws_region
+  azs      = var.azs
+  vpc_cidr = var.vpc_cidr
+}
+
+module "mwaa" {
+  source             = "./modules/mwaa"
+  vpc_id             = module.network.vpc_id
+  private_subnet_ids = module.network.private_subnet_ids
+}
+
+module "emr" {
+  source = "./modules/emr"
+}

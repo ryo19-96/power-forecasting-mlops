@@ -51,7 +51,7 @@ resource "aws_s3_bucket_public_access_block" "block_public_access" {
   restrict_public_buckets = true
 }
 
-# 削除のルールは設定しない
+# EMR後のbacket設定 削除のルールは設定しない
 resource "aws_s3_bucket_lifecycle_configuration" "processed_lifecycle" {
   bucket = aws_s3_bucket.processed.id
   rule {
@@ -62,5 +62,14 @@ resource "aws_s3_bucket_lifecycle_configuration" "processed_lifecycle" {
       days          = 30
       storage_class = "STANDARD_IA"
     }
+  }
+}
+
+# MWAAのアーティファクト用のS3バケット
+resource "aws_s3_bucket" "mwaa" {
+  bucket = "mwaa-artifacts-${terraform.workspace}"
+  tags = {
+    Environment = terraform.workspace
+    Project     = "PowerForecasting"
   }
 }
