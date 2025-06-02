@@ -11,6 +11,12 @@ variable "vpc_cidr" {
   type = string
 }
 
+# NAT Gatewayを有効にするかどうか
+variable "enable_nat_gateway" {
+  type    = bool
+  default = false # デフォルトは無効
+}
+
 # aws VPC
 resource "aws_vpc" "vpc" {
   cidr_block           = var.vpc_cidr # IP範囲
@@ -70,12 +76,12 @@ resource "aws_route_table_association" "public_route_table_associations" {
 
 # NAT Gateway（1 AZ に1つ）
 resource "aws_eip" "nat_gateway_elastic_ips" {
-  count      = length(var.azs)
+  count      = var.enable_nat_gateway ? length(var.azs) : 0 # NAT Gatewayを有効にする場合のみ作成
   depends_on = [aws_internet_gateway.internet_gateway]
 }
 
 resource "aws_nat_gateway" "nat_gateways" {
-  count         = length(var.azs)
+  count         = var.enable_nat_gateway ? length(var.azs) : 0 # NAT Gatewayを有効にする場合のみ作成
   allocation_id = aws_eip.nat_gateway_elastic_ips[count.index].id
   subnet_id     = aws_subnet.public_subnet[count.index].id # Publicサブネットに配置
   tags = {
@@ -99,7 +105,7 @@ resource "aws_route_table" "private_route_table" {
   vpc_id = aws_vpc.vpc.id
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.nat_gateways[count.index].id # 外向き通信をNAT経由にする
+    nat_gateway_id = var.enable_nat_gateway ? aws_nat_gateway.nat_gateways[count.index].id : null # 外向き通信をNAT経由にする
   }
   tags = {
     Name = "power-forecast-private-route-${count.index}"

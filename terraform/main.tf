@@ -50,10 +50,11 @@ module "dynamodb" {
 }
 
 module "network" {
-  source   = "./modules/network"
-  region   = var.aws_region
-  azs      = var.azs
-  vpc_cidr = var.vpc_cidr
+  source             = "./modules/network"
+  region             = var.aws_region
+  azs                = var.azs
+  vpc_cidr           = var.vpc_cidr
+  enable_nat_gateway = var.enable_nat_gateway
 }
 
 module "mwaa" {
@@ -63,5 +64,6 @@ module "mwaa" {
 }
 
 module "emr" {
-  source = "./modules/emr"
+  source                = "./modules/emr"
+  emr_etl_exec_role_arn = module.iam.emr_etl_exec_role.arn
 }

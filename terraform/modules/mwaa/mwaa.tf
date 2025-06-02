@@ -22,7 +22,7 @@ module "mwaa" {
   # DAG/プラグイン用バケット
   create_s3_bucket     = true # モジュールに作らせる
   dag_s3_path          = "dags"
-  requirements_s3_path = "requirements"
+  requirements_s3_path = "requirements.txt"
 
   # ネットワーク
   vpc_id             = var.vpc_id

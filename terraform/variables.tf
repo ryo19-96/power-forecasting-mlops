@@ -1,3 +1,10 @@
+# nat_gateway, elastic_ipは時間でコストがかかるので、不要なときはfalseにする
+# 有効にしたいとき：terraform apply -var="enable_nat_gateway=true"
+variable "enable_nat_gateway" {
+  type    = bool
+  default = false
+}
+
 variable "approval_email_address" {
   type    = string
   default = "temp@example.com"
