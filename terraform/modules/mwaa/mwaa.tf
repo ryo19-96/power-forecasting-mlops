@@ -6,6 +6,55 @@ variable "private_subnet_ids" {
   type = list(string)
 }
 
+variable "emr_etl_exec_role_arn" {
+  type = string
+}
+
+variable "emr_app_id" {
+  type = string
+}
+
+variable "region" {
+  type = string
+}
+
+variable "account_id" {
+  type = string
+}
+
+resource "aws_iam_policy" "mwaa_emr_serverless" {
+  name = "mwaa-emr-serverless"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid    = "AllowEMRServerless",
+        Effect = "Allow",
+        Action = [
+          "emr-serverless:GetApplication",
+          "emr-serverless:StartApplication",
+          "emr-serverless:StopApplication",
+          "emr-serverless:ListApplications",
+          "emr-serverless:StartJobRun",
+          "emr-serverless:GetJobRun",
+          "emr-serverless:CancelJobRun",
+          "emr-serverless:ListJobRuns",
+        ],
+        Resource = [
+          "arn:aws:emr-serverless:${var.region}:${var.account_id}:/applications/${var.emr_app_id}",
+          "arn:aws:emr-serverless:${var.region}:${var.account_id}:/applications/${var.emr_app_id}/jobruns/*"
+        ]
+      },
+      {
+        Sid : "AllowPassRole",
+        Effect   = "Allow",
+        Action   = "iam:PassRole",
+        Resource = var.emr_etl_exec_role_arn,
+      },
+    ]
+  })
+}
+
 # aws-iaのMWAA モジュール呼び出し
 module "mwaa" {
   source  = "aws-ia/mwaa/aws" # terraform registryのモジュール
@@ -28,12 +77,15 @@ module "mwaa" {
   vpc_id             = var.vpc_id
   private_subnet_ids = var.private_subnet_ids
 
+  webserver_access_mode = "PUBLIC_ONLY"
+
   # Airflow UI 接続許可CIDR
   source_cidr = ["0.0.0.0/0"]
 
   # IAM ロール
   iam_role_additional_policies = {
-    "s3-access"   = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
-    "logs-access" = "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
+    "s3-access"             = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+    "logs-access"           = "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
+    "emr-serverless-access" = aws_iam_policy.mwaa_emr_serverless.arn
   }
 }

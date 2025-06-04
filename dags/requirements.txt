@@ -1,0 +1,3 @@
+# EMR DAG Requirements
+boto3
+pandas

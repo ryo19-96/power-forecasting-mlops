@@ -11,6 +11,8 @@ provider "aws" {
   region = "ap-northeast-1"
 }
 
+data "aws_caller_identity" "current" {}
+
 module "s3" {
   source = "./modules/s3"
 }
@@ -58,9 +60,14 @@ module "network" {
 }
 
 module "mwaa" {
-  source             = "./modules/mwaa"
-  vpc_id             = module.network.vpc_id
-  private_subnet_ids = module.network.private_subnet_ids
+  source                = "./modules/mwaa"
+  vpc_id                = module.network.vpc_id
+  private_subnet_ids    = module.network.private_subnet_ids
+  emr_etl_exec_role_arn = module.iam.emr_etl_exec_role.arn
+  emr_app_id            = module.emr.emr_app_id
+  region                = var.aws_region
+  account_id            = data.aws_caller_identity.current.account_id
+
 }
 
 module "emr" {

@@ -1,6 +1,7 @@
 import argparse
 import io
 import os
+from typing import List
 
 import boto3
 import pandas as pd
@@ -45,10 +46,8 @@ def read_power_usage_data(date_str: str) -> pd.DataFrame:
     yyyymm = "-".join(date_str.split("-")[:2])  # YYYY-MM形式に変換
     key = f"raw_power_usage/{yyyymm}/{date_str}/power_usage.csv"
     try:
-        # body = s3_client.get_object(Bucket=RAW_BUCKET, Key=key)["Body"].read()
-        # df = pd.read_csv(io.BytesIO(body), encoding="shift-jis", skiprows=54)
-        with open(f"./data/raw_power_usage/{yyyymm}/{date_str}/power_usage.csv", "rb") as f:
-            df = pd.read_csv(f, encoding="shift-jis", skiprows=54)
+        body = s3_client.get_object(Bucket=RAW_BUCKET, Key=key)["Body"].read()
+        df = pd.read_csv(io.BytesIO(body), encoding="shift-jis", skiprows=54)
         max_power = int(df["当日実績(５分間隔値)(万kW)"].max())
         data = {"date": date_str, "max_power": max_power}
     except s3_client.exceptions.NoSuchKey as e:
@@ -71,10 +70,8 @@ def read_weather_data(date_str: str) -> pd.DataFrame:
     yyyymm = "-".join(date_str.split("-")[:2])  # YYYY-MM形式に変換
     key = f"raw_weather_data/{yyyymm}/{date_str}/weather_data.csv"
     try:
-        # body = s3_client.get_object(Bucket=RAW_BUCKET, Key=key)["Body"].read()
-        # df = pd.read_csv(io.BytesIO(body), encoding="shift-jis")
-        with open(f"./data/raw_weather_data/{yyyymm}/{date_str}/weather_data.csv", "rb") as f:
-            df = pd.read_csv(f)
+        body = s3_client.get_object(Bucket=RAW_BUCKET, Key=key)["Body"].read()
+        df = pd.read_csv(io.BytesIO(body))
         df = df[["date", "最高気温(℃)", "最低気温(℃)", "天気概況(昼：06時〜18時)"]].rename(
             columns={
                 "date": "date",
@@ -89,7 +86,7 @@ def read_weather_data(date_str: str) -> pd.DataFrame:
     return df
 
 
-def main(dates: list[str]) -> None:
+def main(dates: List[str]) -> None:
     """
     メイン処理
     引数で指定された日付の範囲に対して、気象データと電力使用量データを結合し、S3に保存する
@@ -126,18 +123,9 @@ def main(dates: list[str]) -> None:
         on=["date"],
         how="inner",
     )
-    merged_df = merged_df.withColumn("dt_partition", col("date"))
+    merged_df = merged_df.withColumn("dt", col("date"))
     # データの保存
-    merged_df.write.mode("overwrite").partitionBy("dt_partition").parquet("./output/dt_tmp/")
-    # (merged_df.write.mode("overwrite").partitionBy("dt_partition").parquet(f"s3://{PROCESSED_BUCKET}/dt_tmp/"))
-    # rename
-    # カラム名を用いて自動で保存されるため、"dt=YYYY-MM-DD"形式に変更
-    response = s3_client.list_objects_v2(Bucket=PROCESSED_BUCKET, Prefix="dt_tmp/")
-    for obj in response.get("Contents", []):
-        source_key = obj["Key"]
-        new_key = source_key.replace("dt_tmp/dt_partition=", "dt=")
-        s3_client.copy_object(Bucket=PROCESSED_BUCKET, CopySource=f"{PROCESSED_BUCKET}/{source_key}", Key=new_key)
-        s3_client.delete_object(Bucket=PROCESSED_BUCKET, Key=source_key)
+    merged_df.write.mode("overwrite").partitionBy("dt").parquet(f"s3://{PROCESSED_BUCKET}/dt_tmp/")
 
 
 if __name__ == "__main__":

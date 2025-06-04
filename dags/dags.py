@@ -1,3 +1,5 @@
+import logging
+
 import boto3
 from airflow import DAG
 from airflow.operators.dummy import DummyOperator
@@ -5,6 +7,8 @@ from airflow.operators.python import BranchPythonOperator, PythonOperator
 from airflow.providers.amazon.aws.operators.emr import EmrServerlessStartJobOperator
 from airflow.utils.dates import days_ago
 from check_unprocessed_dates import check_unprocessed_dates, decide_to_run_emr
+
+logger = logging.getLogger(__name__)
 
 
 def choose_dates(**context) -> str:
@@ -19,9 +23,11 @@ def choose_dates(**context) -> str:
         (str): 前のタスクから取得した日付("YYYY-MM-DD, YYYY-MM-DD, ...")
     """
     ti = context["ti"]
-    target_dates = ti.xcom_pull(task_ids="check_unprocessed_dates", key="targets")
+    target_dates = ti.xcom_pull(task_ids="check_unprocessed_dates_op", key="targets")
+    target_dates = ",".join(target_dates)
+    logger.info(f"Selected date range for ETL: {target_dates}")
 
-    return ",".join(target_dates)
+    return target_dates
 
 
 def get_param(name: str) -> str:
@@ -32,7 +38,8 @@ def get_param(name: str) -> str:
         name (str): 取得するパラメータの名前
 
     Returns:
-        (str): パラメータの値"""
+        (str): パラメータの値
+    """
     ssm_client = boto3.client("ssm", region_name="ap-northeast-1")
     response = ssm_client.get_parameter(Name=name)
     return response["Parameter"]["Value"]
@@ -40,7 +47,7 @@ def get_param(name: str) -> str:
 
 # DAG定義
 with DAG(
-    dag_id="check_unprocessed_dates",
+    dag_id="etl_data",
     start_date=days_ago(1),
     schedule_interval=None,  # Noneに設定すると手動実行のみ
     catchup=False,
@@ -52,16 +59,18 @@ with DAG(
         python_callable=check_unprocessed_dates,
         do_xcom_push=True,
     )
-    # 前タスクでXcomに保存されているか確認し、EMRジョブを実行するかスキップするかを決定タスク
-    branch_to_emr_or_skip = BranchPythonOperator(
-        task_id="branch_to_emr_or_skip",
-        python_callable=decide_to_run_emr,
-        provide_context=True,
-    )
     # Xcomに保存されている未処理の日付を取得し、次のタスクで使用するための文字列形式に変換するタスク
     pick_date_range = PythonOperator(
         task_id="pick_date_range",
         python_callable=choose_dates,
+        provide_context=True,
+        do_xcom_push=True,
+    )
+
+    # 前タスクでXcomに保存されているか確認し、EMRジョブを実行するかスキップするかを決定タスク
+    branch_to_emr_or_skip = BranchPythonOperator(
+        task_id="branch_to_emr_or_skip",
+        python_callable=decide_to_run_emr,
         provide_context=True,
     )
 
@@ -75,14 +84,25 @@ with DAG(
         execution_role_arn=execution_role_arn,
         job_driver={
             "sparkSubmit": {
-                "entryPoint": "s3://scripts/etl_data.py",
-                "entryPointArguments": ["--dates", "{{ ti.xcom_pull(task_ids='pick_date_range')['return_value'] }}"],
-                "sparkSubmitParameters": "--conf spark.executor.memory=4g",
+                "entryPoint": "s3://power-forecasting-emr-scripts-dev/etl_data.py",
+                "entryPointArguments": ["--dates", "{{ ti.xcom_pull(task_ids='pick_date_range') }}"],
+                "sparkSubmitParameters": (
+                    "--conf spark.executor.memory=2g "
+                    "--conf spark.executor.cores=1 "
+                    "--conf spark.executor.instances=1 "
+                    "--conf spark.dynamicAllocation.enabled=false "
+                    "--conf spark.driver.memory=1g "
+                    "--conf spark.driver.cores=1 "
+                ),
             },
         },
-        polling_interval_seconds=60,
+        configuration_overrides={
+            "monitoringConfiguration": {
+                "s3MonitoringConfiguration": {"logUri": "s3://power-forecasting-emr-scripts-dev/logs/"},
+            },
+        },
     )
 
     skip_etl = DummyOperator(task_id="skip_etl")
 
-    check_unprocessed_dates_op >> branch_to_emr_or_skip >> [run_emr_job, skip_etl]
+    check_unprocessed_dates_op >> pick_date_range >> branch_to_emr_or_skip >> [run_emr_job, skip_etl]

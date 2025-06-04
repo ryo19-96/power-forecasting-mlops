@@ -21,7 +21,7 @@ variable "enable_nat_gateway" {
 resource "aws_vpc" "vpc" {
   cidr_block           = var.vpc_cidr # IP範囲
   enable_dns_support   = true
-  enable_dns_hostnames = true # DNS名を付与
+  enable_dns_hostnames = true
   tags = {
     Name = "power-forecast-vpc-${terraform.workspace}"
   }
@@ -125,4 +125,8 @@ output "vpc_id" {
 
 output "private_subnet_ids" {
   value = aws_subnet.private_subnet[*].id
+}
+
+output "public_subnet_ids" {
+  value = aws_subnet.public_subnet[*].id
 }

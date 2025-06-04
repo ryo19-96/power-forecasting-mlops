@@ -8,9 +8,13 @@ resource "aws_emrserverless_application" "etl" {
   type          = "spark"
 
   maximum_capacity {
-    cpu    = "2 vCPU"
-    memory = "10 GB"
+    cpu    = "4 vCPU"
+    memory = "16 GB"
   }
+}
+
+output "emr_app_id" {
+  value = aws_emrserverless_application.etl.id
 }
 
 # EMR Serverless Applicationで使用する値をparameter storeに保存
