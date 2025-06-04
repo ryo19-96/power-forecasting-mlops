@@ -67,7 +67,7 @@ def update_watermark(date_str: str, job: str = "etl_data") -> None:
 with DAG(
     dag_id="etl_data",
     start_date=days_ago(1),
-    schedule_interval=None,  # Noneに設定すると手動実行のみ
+    schedule_interval="0 3 * * *",  # 日本時間で毎日12時に実行
     catchup=False,
     tags=["example"],
 ) as dag:
