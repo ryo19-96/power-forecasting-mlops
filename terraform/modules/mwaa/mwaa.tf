@@ -79,10 +79,11 @@ module "mwaa" {
   min_workers = 1
   max_workers = 5
 
-  # DAG/プラグイン用バケット
-  create_s3_bucket     = true # モジュールに作らせる
-  dag_s3_path          = "dags"
-  requirements_s3_path = "requirements.txt"
+  # Airflow 設定
+  create_s3_bucket       = true
+  dag_s3_path            = "dags"
+  requirements_s3_path   = "requirements.txt"
+  startup_script_s3_path = "startup.sh"
 
   # ネットワーク
   vpc_id             = var.vpc_id

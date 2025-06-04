@@ -1,14 +1,14 @@
+import datetime
 import logging
 
 import boto3
+import pytz
 from airflow import DAG
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.python import BranchPythonOperator, PythonOperator
 from airflow.providers.amazon.aws.operators.emr import EmrServerlessStartJobOperator
 from airflow.utils.dates import days_ago
 from check_unprocessed_dates import check_unprocessed_dates, decide_to_run_emr
-import pytz
-import datetime
 
 logger = logging.getLogger(__name__)
 

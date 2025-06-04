@@ -1,6 +1,4 @@
 import datetime
-import io
-import json
 import os
 import re
 from typing import Iterator, List
@@ -8,7 +6,6 @@ from typing import Iterator, List
 import boto3
 
 RAW_BUCKET = os.environ.get("RAW_BUCKET", "power-forecasting-extract-data-dev")
-# WATERMARK_KEY = os.environ.get("WATERMARK_KEY", "system/watermark.json")
 
 table = boto3.resource("dynamodb").Table("watermark-dev")
 s3_client = boto3.client("s3")
@@ -26,25 +23,6 @@ def get_watermark(job: str = "etl_data") -> str:
     """
     item = table.get_item(Key={"job_name": job}).get("Item")
     return item["last_processed"] if item else "2022-01-01"
-
-
-# def check_watermark_dates() -> str:
-#     """
-#     S3バケットからウォーターマークファイルを取得し、処理済みの日付を確認する。
-
-#     Returns:
-#         str: 処理された最後の日付（YYYY-MM-DD形式）。ウォーターマークファイルが存在しない場合は1970-01-01を返す
-
-#     Raises:
-#         FileNotFoundError: ウォーターマークファイルが存在しない場合に発生
-#     """
-#     try:
-#         s3_object = s3_client.get_object(Bucket=RAW_BUCKET, Key=WATERMARK_KEY)
-#         watermark_data = json.load(io.BytesIO(s3_object["Body"].read()))
-#         return watermark_data.get("last_processed", "1970-01-01")
-#     except s3_client.exceptions.NoSuchKey:
-#         msg = f"Watermark file {WATERMARK_KEY} does not exist in bucket {RAW_BUCKET}."
-#         raise FileNotFoundError(msg)
 
 
 def list_unprocessed_dates() -> List[str]:
