@@ -7,8 +7,14 @@ from airflow.operators.python import BranchPythonOperator, PythonOperator
 from airflow.providers.amazon.aws.operators.emr import EmrServerlessStartJobOperator
 from airflow.utils.dates import days_ago
 from check_unprocessed_dates import check_unprocessed_dates, decide_to_run_emr
+import pytz
+import datetime
 
 logger = logging.getLogger(__name__)
+
+table = boto3.resource("dynamodb").Table("watermark-dev")
+
+jst = pytz.timezone("Asia/Tokyo")
 
 
 def choose_dates(**context) -> str:
@@ -43,6 +49,18 @@ def get_param(name: str) -> str:
     ssm_client = boto3.client("ssm", region_name="ap-northeast-1")
     response = ssm_client.get_parameter(Name=name)
     return response["Parameter"]["Value"]
+
+
+def update_watermark(date_str: str, job: str = "etl_data") -> None:
+    table.update_item(
+        Key={"job_name": job},
+        UpdateExpression="SET last_processed = :d, updated_at = :t",
+        ConditionExpression="attribute_not_exists(last_processed) OR last_processed < :d",
+        ExpressionAttributeValues={
+            ":d": date_str,
+            ":t": datetime.datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S"),
+        },
+    )
 
 
 # DAG定義
@@ -105,4 +123,17 @@ with DAG(
 
     skip_etl = DummyOperator(task_id="skip_etl")
 
-    check_unprocessed_dates_op >> pick_date_range >> branch_to_emr_or_skip >> [run_emr_job, skip_etl]
+    # EMRジョブ完了後にウォーターマークを更新するタスク
+    update_watermark_op = PythonOperator(
+        task_id="update_watermark_op",
+        python_callable=update_watermark,
+        op_kwargs={
+            "date_str": "{{ ti.xcom_pull(task_ids='pick_date_range').split(',')[-1].strip() }}",
+            "job": "etl_data",
+        },
+        trigger_rule="all_success",
+    )
+
+    check_unprocessed_dates_op >> pick_date_range >> branch_to_emr_or_skip
+    branch_to_emr_or_skip >> run_emr_job >> update_watermark_op
+    branch_to_emr_or_skip >> skip_etl

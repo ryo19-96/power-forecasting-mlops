@@ -51,6 +51,17 @@ resource "aws_iam_policy" "mwaa_emr_serverless" {
         Action   = "iam:PassRole",
         Resource = var.emr_etl_exec_role_arn,
       },
+      {
+        Sid    = "AllowDynamoDBAccess"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem"
+        ]
+        Resource = "*"
+      },
     ]
   })
 }

@@ -8,8 +8,8 @@ resource "aws_emrserverless_application" "etl" {
   type          = "spark"
 
   maximum_capacity {
-    cpu    = "4 vCPU"
-    memory = "16 GB"
+    cpu    = "2 vCPU"
+    memory = "8 GB"
   }
 }
 

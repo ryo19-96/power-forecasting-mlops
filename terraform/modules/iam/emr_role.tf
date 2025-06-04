@@ -42,7 +42,18 @@ resource "aws_iam_policy" "emr_etl_exec_policy" {
           "logs:PutLogEvents"
         ]
         Resource = "*"
-      }
+      },
+      {
+        Sid    = "AllowDynamoDBAccess"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem"
+        ]
+        Resource = "*"
+      },
     ]
   })
 }

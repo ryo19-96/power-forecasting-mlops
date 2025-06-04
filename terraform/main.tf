@@ -67,7 +67,6 @@ module "mwaa" {
   emr_app_id            = module.emr.emr_app_id
   region                = var.aws_region
   account_id            = data.aws_caller_identity.current.account_id
-
 }
 
 module "emr" {
