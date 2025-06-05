@@ -125,7 +125,8 @@ def main(dates: List[str]) -> None:
     )
     merged_df = merged_df.withColumn("dt", col("date"))
     # データの保存
-    merged_df.write.mode("overwrite").partitionBy("dt").parquet(f"s3://{PROCESSED_BUCKET}/dt_tmp/")
+    spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
+    (merged_df.write.mode("overwrite").partitionBy("dt").parquet(f"s3://{PROCESSED_BUCKET}/"))
 
 
 if __name__ == "__main__":

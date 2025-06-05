@@ -65,15 +65,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "processed_lifecycle" {
   }
 }
 
-# MWAAのアーティファクト用のS3バケット
-resource "aws_s3_bucket" "mwaa" {
-  bucket = "mwaa-artifacts-${terraform.workspace}"
-  tags = {
-    Environment = terraform.workspace
-    Project     = "PowerForecasting"
-  }
-}
-
 # EMRのスクリプト用のS3バケット
 resource "aws_s3_bucket" "emr_scripts" {
   bucket = "power-forecasting-emr-scripts-${terraform.workspace}"
