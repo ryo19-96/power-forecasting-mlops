@@ -10,13 +10,13 @@ sys.path.append("/opt/ml/processing/deps")
 import argparse
 import logging
 import os
+from io import StringIO
 from pathlib import Path
 
 import holidays
 import numpy as np
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
-from io import StringIO
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
