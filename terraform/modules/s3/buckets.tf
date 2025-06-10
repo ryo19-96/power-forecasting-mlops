@@ -73,3 +73,26 @@ resource "aws_s3_bucket" "emr_scripts" {
     Project     = "PowerForecasting"
   }
 }
+
+# オフラインストアのS3バケット
+resource "aws_s3_bucket" "offline_store" {
+  bucket        = "power-forecast-featurestore-offline-${terraform.workspace}"
+  force_destroy = true
+  tags = {
+    Environment = terraform.workspace
+    Project     = "PowerForecasting"
+  }
+}
+output "offline_bucket" {
+  value = aws_s3_bucket.offline_store.bucket
+}
+
+# Athenaのクエリ用のS3バケット
+resource "aws_s3_bucket" "athena_query_results" {
+  bucket        = "power-forecast-athena-query-results-${terraform.workspace}"
+  force_destroy = true
+  tags = {
+    Environment = terraform.workspace
+    Project     = "PowerForecasting"
+  }
+}

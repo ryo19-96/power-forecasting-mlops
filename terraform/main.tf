@@ -18,7 +18,8 @@ module "s3" {
 }
 
 module "iam" {
-  source = "./modules/iam"
+  source     = "./modules/iam"
+  account_id = data.aws_caller_identity.current.account_id
 }
 
 module "lambda" {
@@ -67,9 +68,16 @@ module "mwaa" {
   emr_app_id            = module.emr.emr_app_id
   region                = var.aws_region
   account_id            = data.aws_caller_identity.current.account_id
+  enable_nat_gateway    = var.enable_nat_gateway
 }
 
 module "emr" {
   source                = "./modules/emr"
   emr_etl_exec_role_arn = module.iam.emr_etl_exec_role.arn
+}
+
+module "feature_store" {
+  source                          = "./modules/feature_store"
+  offline_bucket                  = module.s3.offline_bucket
+  sagemaker_featurestore_role_arn = module.iam.sagemaker_featurestore_role_arn
 }

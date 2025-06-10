@@ -22,6 +22,10 @@ variable "account_id" {
   type = string
 }
 
+variable "enable_nat_gateway" {
+  type = bool
+}
+
 resource "aws_iam_policy" "mwaa_emr_serverless" {
   name = "mwaa-emr-serverless"
   policy = jsonencode({
@@ -67,7 +71,9 @@ resource "aws_iam_policy" "mwaa_emr_serverless" {
 }
 
 # aws-iaのMWAA モジュール呼び出し
+# MWAAはNAT必須なのでenable_nat_gatewayがtrueのときのみ実行されるようにする
 module "mwaa" {
+  count   = var.enable_nat_gateway ? 1 : 0
   source  = "aws-ia/mwaa/aws" # terraform registryのモジュール
   version = "0.0.6"
 
