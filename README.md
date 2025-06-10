@@ -6,6 +6,11 @@ MLOpsの学習および実践を目的として、気象データと過去の電
 前処理、学習、評価、可視化、モデル登録、デプロイといった一連のプロセスを AWS SageMaker Pipeline 上に構築し、データ・成果物の保存には S3、インフラの構成管理には Terraform を用いて、クラウドネイティブな MLOps 運用を一貫して自動化・管理しています。  
 デプロイしたserverless inference のエンドポイントにアクセスすることで予測値を取得することができます。  
 
+本プロジェクトでは、大規模データの処理を想定し、S3に保存されたデータに対して毎日12時にAWS MWAA上でSparkによるETL処理を実行しています。また、実験の柔軟性を高めるために、Feature Storeを導入し、特徴量の再利用性と一貫性を確保しています。
+
+
+
+
 ## 使用データ
 
 本プロジェクトでは以下のデータを利用しています：
@@ -23,28 +28,52 @@ MLOpsの学習および実践を目的として、気象データと過去の電
    - 期間：2022年4月～2024年12月
    - 内容：日別の最高気温、最低気温、天気（晴れ、曇り、雨など）
 
+## プロジェクトのシステム要件・シミュレーション概要
+
+本プロジェクトは以下のような運用要件を想定しています。
+
+**利用目的**  
+ - 翌日の電力需要予測を行い、電力供給計画の最適化や異常検知に活用  
+
+**利用者想定**  
+ - 予測値を基に電力需給バランスを調整するオペレーター
+
+**業務フロー**
+ - 担当者が午前12時までに最新データを指定S3にアップロード
+ - 12時にETL処理（Spark + MWAA）を実行し、データをクレンジング・結合
+ - 14時にモデルパイプラインが自動起動し、学習・評価・可視化を実施
+ - 精度が基準を満たすと承認プロセスを経て自動でエンドポイントにデプロイ
+ - ユーザーはFastAPI経由で予測値を取得し、業務判断に活用
+
+**スケーラビリティ要件**
+ - 数年分を想定し、Spark + S3構成を選定
+ - 再学習頻度は日次
+
 
 ## アーキテクチャ
 
-![アーキテクチャ図](images/architecture_diagram_v1.png)
+![アーキテクチャ図](images/architecture_diagram_v2.png)
 
 ### ワークフロー詳細
-1. 以下の条件でModel Pilenineが起動します
+1. 担当者がS3ディレクトリにデータを保存する
+2. Lamdaが起動し、zipファイルの解凍とデータの抽出を行う
+3. 毎日12時にMWAA, EMR が起動し、データクレンジング・結合を行いS3へ保存する（MWAAの各タスクは[MWAA(Apache Airflow) 詳細](#mwaaapache-airflow-詳細)を参照）
+4. 以下条件でModel Pipelineが起動し、特徴量エンジニアリング → Feature Storeへ保存 → エンコーディング・データ分割 → モデル学習 → 評価 → 可視化 → 閾値判定 までを自動で実行します  （各ステップの詳細は[パイプライン詳細](#パイプライン詳細)を参照）　　
+    - 14時での自動実行
     - GitHub 上で対象ディレクトリに変更があり、main ブランチへマージされたとき（GitHub Actions 経由）
     - `run_pipeline.py` を手動で実行したとき
-2. Model Pipeline が前処理 → 特徴量エンジニアリング → モデル学習 → 評価 → 可視化 → 閾値判定 までを自動で実行します  （各ステップの詳細は[パイプライン詳細](#パイプライン詳細)を参照）
-3. 評価メトリクスが指定閾値を満たしたモデルは、Model Registry に `PendingManualApproval` 状態で登録されます
-4. EventBridge が `PendingManualApproval` のモデル登録イベントを検知し、承認用リンクを含む Eメールを SES 経由で送信する Lambda をトリガーします
-5. 承認者はメール内の `Approve` または `Reject` をクリックします
-6. API Gateway が Lambda を呼び出し、次の処理が行われます
+5. 評価メトリクスが指定閾値を満たしたモデルは、Model Registry に `PendingManualApproval` 状態で登録されます
+6. EventBridge が `PendingManualApproval` のモデル登録イベントを検知し、承認用リンクを含む Eメールを SES 経由で送信する Lambda をトリガーします
+7. 承認者はメール内の `Approve` または `Reject` をクリックします
+8.  API Gateway が Lambda を呼び出し、次の処理が行われます
     - Model Registry 内のステータスを `Approved` または `Rejected` に更新
     - `Approved` の場合、そのモデルの ARN を Parameter Store に保存
     - `Approved` の場合、Deployment Pipeline を起動
-7. Deployment Pipeline が `Approved` モデルを Serverless Inference にデプロイします
-8. デプロイ完了後、EventBridge が成功イベントを検知し、Parameter Store に以下を保存します
+9.  Deployment Pipeline が `Approved` モデルを Serverless Inference にデプロイします
+10. デプロイ完了後、EventBridge が成功イベントを検知し、Parameter Store に以下を保存します
     - モデル ARN
     - エンドポイント名
-9. ユーザーはエンドポイントに対してAPIリクエストを送信し、推論結果を取得することができます
+11. ユーザーはエンドポイントに対してAPIリクエストを送信し、推論結果を取得することができます
 
 ### 特徴量エンジニアリング設計について
 
@@ -53,22 +82,35 @@ MLOpsの学習および実践を目的として、気象データと過去の電
 - データ量が現状小規模なため、分散処理（Spark）は導入していませんが、構成としては SparkProcessor や EMR Step に置き換え可能
 - OHE などのモデル依存の処理は学習ステップで実施し、推論時にも再利用可能なように encoder を保存
 
+## MWAA(Apache Airflow) 詳細
+
+![MWAA image](images/mwaa_v2.png)
+
+| タスク                       | 内容                                                                                                                                          |
+| :--------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check_unprocessed_dates_op` | S3バケット内のraw_power_usageとraw_weather_dataディレクトリから日付をリストを抽出し、DynamoDBに保存されている最後の処理日より新しい日付を返す |
+| `pick_date_range`            | "YYYY-MM-DD, YYYY-MM-DD, ..."の文字列形式で未処理の日付を返す                                                                                 |
+| `branch_to_emr_or_skip`      | 未処理の日付がある場合はEMRジョブを実行し、ない場合はスキップする                                                                             |
+| `skip_etl`                   | 処理をスキップ                                                                                                                                |
+| `run_emr_job`                | 日付毎にデータのクレンジング、結合、保存里処理を実行する                                                                                      |
+| `update_watermark_op`        | 処理をした最後の日付をDynamoDBへ保存する                                                                                                      |
 
 
 ## パイプライン詳細
 
-![パイプラインimage](images/pipeline_image_v1.png)
+![パイプラインimage](images/pipeline_image_v2.png)
 
-| ステップ                                   | 内容                               |
-| :----------------------------------------- | :--------------------------------- |
-| `LoadData`                                 | データのロード                     |
-| `PreprocessData`                           | 前処理・特徴量エンジニアリング     |
-| `TrainModel`                               | モデル学習                         |
-| `VisualizeResults`                         | モデル性能・変数重要度などの可視化 |
-| `EvaluateModel`                            | モデル評価                         |
-| `CheckMSEPowerForecastEvaluation`          | モデル性能の確認                   |
-| `sklearn-RepackModel`                      | 推論できる形式に再パッケージ       |
-| `RegisterPowerForecastModel-RegisterModel` | モデルの登録                       |
+| ステップ                                   | 内容                                           |
+| :----------------------------------------- | :--------------------------------------------- |
+| `PreprocessData`                           | 特徴量エンジニアリング                         |
+| `IngestToFeatureStore`                     | Feature Store へ登録                           |
+| `DataPrepFromFeatureStore`                 | Feature Store からデータ取得、エンコーディング |
+| `TrainModel`                               | モデル学習                                     |
+| `VisualizeResults`                         | モデル性能・変数重要度などの可視化             |
+| `EvaluateModel`                            | モデル評価                                     |
+| `CheckMSEPowerForecastEvaluation`          | モデル性能の確認                               |
+| `sklearn-RepackModel`                      | 推論できる形式に再パッケージ                   |
+| `RegisterPowerForecastModel-RegisterModel` | モデルの登録                                   |
 
 
 
@@ -77,7 +119,9 @@ MLOpsの学習および実践を目的として、気象データと過去の電
 | ディレクトリ/ファイル | 内容                                       |
 | :-------------------- | :----------------------------------------- |
 | `.github/`            | ワークフロー定義（CI）                     |
+| `dags/`               | MWAA での DAG 定義                         |
 | `inference_api/`      | 推論API                                    |
+| `notebooks/`          | 実験で使用したnotebook                     |
 | `src/`                | 前処理・学習・評価・推論などのステップ定義 |
 | `pipeline/`           | パイプライン定義・実行                     |
 | `terraform/`          | AWSインフラ構成                            |
@@ -90,18 +134,20 @@ MLOpsの学習および実践を目的として、気象データと過去の電
 
 ## 主要ファイル・機能
 
-| ファイル名                                            | 役割                                      |
-| :---------------------------------------------------- | :---------------------------------------- |
-| `src/preprocess.py`                                   | データ前処理                              |
-| `src/feature_encoder.py`                              | 特徴量エンジニアリング（エンコード）      |
-| `src/evaluate.py`                                     | モデル評価                                |
-| `src/visualization.py`                                | 結果可視化                                |
-| `pipeline/deployment_pipeline/deployment_pipeline.py` | デプロイパイプライン定義                  |
-| `pipeline/model_pipeline/run_pipeline.py`             | 一連のパイプライン実行                    |
-| `pipeline/model_pipeline/model_pipeline.py`           | モデルパイプライン定義                    |
-| `terraform/`                                          | AWSリソース管理（S3, IAM, EventBridge等） |
-| `lambda/`                                             | Lambda関数                                |
-| `inference_api/`                                      | FastAPIの処理                             |
+| ファイル名                                            | 役割                                           |
+| :---------------------------------------------------- | :--------------------------------------------- |
+| `dags/dags.py`                                        | MWAA での DAG 定義                             |
+| `src/preprocess.py`                                   | 特徴量エンジニアリング（エンコーディング除く） |
+| `src/ingest_feature_store.py`                         | Feature Store へ登録                           |
+| `src/dataprep_from_future_store.py`                   | エンコーディング、データスプリット             |
+| `src/evaluate.py`                                     | モデル評価                                     |
+| `src/visualization.py`                                | 結果可視化                                     |
+| `pipeline/deployment_pipeline/deployment_pipeline.py` | デプロイパイプライン定義                       |
+| `pipeline/model_pipeline/run_pipeline.py`             | 一連のパイプライン実行                         |
+| `pipeline/model_pipeline/model_pipeline.py`           | モデルパイプライン定義                         |
+| `terraform/`                                          | AWSリソース管理（S3, IAM, EventBridge等）      |
+| `lambda/`                                             | Lambda関数                                     |
+| `inference_api/`                                      | FastAPIの処理                                  |
 
 
 
@@ -143,13 +189,36 @@ terrafrom init
 terraform plan # 適用内容の確認
 terraform apply # 適用
 ```
+S3バケットは同じ名前で作成できないかもしれません。。。  
+その場合`terraform/modules/s3/buckets.tf`のbucketでバケット名を変更してください。また、以降のバケット箇所は読み替えて実施してください。  
+
+**※MWAA関連は高コストなので`terraform apply`ではMWAA関連の環境は構築されないようになっています。MWAA含めて構築する場合は`terraform apply -var="enable_nat_gateway=true"`で実行してください**
+NAT Gateway や Elastic IPS は常に課金されるので使用後は以下で削除することを推奨
+```
+terraform destroy \
+  -target=module.network.aws_eip.nat_gateway_elastic_ips \
+  -target=module.network.aws_nat_gateway.nat_gateways \
+  -target=module.mwaa
+```
+
+
 6. 学習で使用するデータをS3に保存  
 特に設定を変えていない場合はダウンロードしたデータを`power-forecasting-mlops-dev>data`に以下を保存
 - power_usageのディレクトリを作成し、中に`202204_power_usage.zip` ~ `202412_power_usage.zip`
 - `weather_data.csv`
 
+7. MWAAで使用するスクリプトをS3に保存  
+ - mwaa-〇〇バケットに`dags/`のrequirements.txtを配置、dagsディレクトリを作成し`dags/`の以下ファイルを配置
+   - `__init__.py`
+   - `check_unprocessed_dates.py`
+   - `dags.py`
+ - power-forecasting-emr-scripts-devバケットに`dags/`の以下ファイルを配置
+   - etl_data.py
+   - startup.sh
 
-## makefile ユースケース
+
+
+## ユースケース
 
 このプロジェクトでは make ファイルを作成していますが、一部対応できていない箇所もあります。  
 
@@ -168,6 +237,18 @@ zip_lambda file={ファイル名} # 拡張子は不要です
 ```
 上記コマンドでlambdaディレクトリにあるpythonファイルを同じディレクトリにzipファイルが作成されます。（ファイル名は同じ）  
 あとはlambda関連の terraform の設定を記述して、apply を実行してください。
+
+### MWAA を実行したい
+ - terraformで MWAA の環境が作成されていることを確認してください
+ - 対象ファイルがS3の`power-forecasting-raw-data-dev`に以下のように保存されていることを確認してください
+   - power_usage
+     -  s3://power-forecasting-raw-data-dev/power_usage/202204_power_usage.zip
+     - s3://power-forecasting-raw-data-dev/power_usage/202205_power_usage.zip 
+   - weather_data
+     - s3://power-forecasting-raw-data-dev/weather_data/weather_data.csv
+
+[MWAA コンソール](https://ap-northeast-1.console.aws.amazon.com/mwaa/home?region=ap-northeast-1#home?landingPageCheck=1)から行ける Air Flow のUI上で対象のDAG(`etl_data`)を手動実行できます。もしくは環境が構築されていれば12時に自動実行されます。  
+実行が成功すると`power-forecasting-processed-data-dev`に処理後のデータがあることを確認できます。
 
 ### model pipelieを実行したい
 ```sh
@@ -261,13 +342,10 @@ Response が表示されpredictionsに予測値が入っていれば成功です
 ### 2.  コスト最適化（FinOps）
 - S3やログのライフサイクル設定などのストレージコスト最適化
 
-### 3. Feature Storeの導入
-- 特徴量管理の一元化
-
-### 4. 環境分離
+### 3. 環境分離
 - dev/prod などの環境ごとにバケット・エンドポイントを切り替える仕組みの導入する
 
-### 5. CI/CD パイプラインの拡張
+### 4. CI/CD パイプラインの拡張
 - 本番環境へのデプロイ自動化
 
 
