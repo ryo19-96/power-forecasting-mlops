@@ -16,6 +16,7 @@ import holidays
 import numpy as np
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
+from io import StringIO
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -66,7 +67,9 @@ def load_emr_output(input_path: str) -> pd.DataFrame:
         return_df = return_df.drop(columns=["dt"])
     # 日付をdatetime型に変換
     return_df["date"] = pd.to_datetime(return_df["date"], format="%Y-%m-%d")
-    logger.info(f"DataFrame info: {return_df.info()}")
+    buffer = StringIO()
+    return_df.info(buf=buffer)
+    logger.info(f"DataFrame info: {buffer.getvalue()}")
     logger.info(f"DataFrame start_date: {return_df['date'].min()}")
     logger.info(f"DataFrame end_date: {return_df['date'].max()}")
     return return_df
@@ -280,7 +283,9 @@ if __name__ == "__main__":
     feature_engineering = FeatureEngineering(config=config)
     # データの前処理
     processed_data = feature_engineering.make_features(data)
-    logger.info(f"Processed data info: {processed_data.info()}")
+    buffer = StringIO()
+    processed_data.info(buf=buffer)
+    logger.info(f"Processed data info: {buffer.getvalue()}")
 
     # データの保存
     Path(f"{base_dir}/extract_features").mkdir(parents=True, exist_ok=True)
