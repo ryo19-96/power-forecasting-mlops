@@ -10,16 +10,12 @@ sys.path.append("/opt/ml/processing/deps")
 import argparse
 import logging
 import os
-import pickle
 from pathlib import Path
-from typing import Dict, Tuple, Union
 
 import holidays
 import numpy as np
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
-
-from feature_encoder import FeatureEncoder
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -38,10 +34,42 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--input-data",
         type=str,
-        default=os.environ.get("SM_CHANNEL_INPUT", "/opt/ml/processing/input_data/merged_data.pkl"),
+        default=os.environ.get("SM_CHANNEL_INPUT", "/opt/ml/processing/input_data/"),
     )
 
     return parser.parse_args()
+
+
+def load_emr_output(input_path: str) -> pd.DataFrame:
+    """EMRの出力ファイルを読み込む
+    mwaaでの前処理後は以下のような形式で保存されている
+    dt=2022-04-01/part-00000-xxxx.snappy.parquet
+    dt=2022-04-02/part-00000-xxxx.snappy.parquet
+    ⋮
+
+    Args:
+        s3_dir: EMRの出力ファイルのパス
+
+    Returns:
+        pd.DataFrame: 読み込んだデータフレーム
+    """
+    file_paths = list(Path(input_path).rglob("*.parquet"))
+    if not file_paths:
+        msg = f"No parquet files found under {input_path}"
+        raise ValueError(msg)
+
+    dfs = [pd.read_parquet(path) for path in file_paths]
+    logger.info(f"Loaded {len(dfs)} files from {input_path}")
+    return_df = pd.concat(dfs, ignore_index=True)
+    # dt列が追加されるので削除
+    if "dt" in return_df.columns:
+        return_df = return_df.drop(columns=["dt"])
+    # 日付をdatetime型に変換
+    return_df["date"] = pd.to_datetime(return_df["date"], format="%Y-%m-%d")
+    logger.info(f"DataFrame info: {return_df.info()}")
+    logger.info(f"DataFrame start_date: {return_df['date'].min()}")
+    logger.info(f"DataFrame end_date: {return_df['date'].max()}")
+    return return_df
 
 
 def load_config(config_path: str) -> DictConfig:
@@ -55,19 +83,6 @@ def load_config(config_path: str) -> DictConfig:
     """
     config = DictConfig(OmegaConf.load(config_path))
     return config
-
-
-def load_data(file_path: str) -> pd.DataFrame:
-    """データを読み込む
-
-    Args:
-        file_path: データファイルのパス
-
-    Returns:
-        pd.DataFrame: 読み込んだデータフレーム
-    """
-    df = pd.read_pickle(file_path)
-    return df
 
 
 class FeatureEngineering:
@@ -226,41 +241,6 @@ class FeatureEngineering:
 
         return result_df
 
-    def encode_features(
-        self,
-        df: pd.DataFrame,
-        config: DictConfig,
-        reset_encoders: bool = False,
-    ) -> Tuple[pd.DataFrame, Dict[str, FeatureEncoder]]:
-        """特徴量をエンコードする
-
-        Args:
-            df: 特徴量を含むデータフレーム
-            config: 設定ファイルの内容
-            reset_encoders: エンコーダーを初期化するかどうか
-
-        Returns:
-            Tuple[pd.DataFrame, Dict[str, FeatureEncoder]]: エンコードされたデータフレームとエンコーダーの辞書
-        """
-        # encoders_dictを必ず初期化
-        encoders_dict = {} if reset_encoders else getattr(self, "_encoders_dict", {})
-
-        result_df = df.copy()
-
-        if "encoders" in config:
-            for params in config["encoders"]:
-                if params["name"] not in encoders_dict:
-                    encoder = FeatureEncoder(**params)
-                    result_df = encoder.fit_transform(result_df)
-                    encoders_dict[params["name"]] = encoder
-                else:
-                    encoder = encoders_dict[params["name"]]
-                    result_df = encoder.transform(result_df)
-
-        # selfに保存しておく（再利用用）
-        self._encoders_dict = encoders_dict
-        return result_df, encoders_dict
-
     def make_features(
         self,
         df: pd.DataFrame,
@@ -286,109 +266,6 @@ class FeatureEngineering:
         df = self.create_calendar_features(df, date_col=date_col)
         return df
 
-    def apply_encoders(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, dict]:
-        """エンコーダーを適用する
-
-        Returns:
-            Tuple[pd.DataFrame, dict]: エンコード後データフレームとエンコーダー辞書
-        """
-        # 目的変数を一時的に除外
-        target_col = "max_power"
-        y = df.pop(target_col) if target_col in df.columns else None
-        if self.config and "encoders" in self.config:
-            df, encoders_dict = self.encode_features(df, self.config)
-        else:
-            encoders_dict = {}
-        # 目的変数を先頭に戻す
-        if y is not None:
-            df = pd.concat([y, df], axis=1)
-        return df, encoders_dict
-
-
-def format_target_first(df: pd.DataFrame, target_col: str = "max_power") -> pd.DataFrame:
-    """目的変数を明示的に最初のカラムに移動する
-    Args:
-        df: 入力データフレーム
-        target_col: 目的変数のカラム名
-
-    Returns:
-        pd.DataFrame: 目的変数が最初のカラムに移動したデータフレーム
-
-    Notes:
-        awsのビルドインモデルを使用した場合先頭列に目的変数が必要なため列の順番を変更する
-    """
-    y = df.pop(target_col)
-    return pd.concat([y, df], axis=1)
-
-
-def train_test_split(
-    df: pd.DataFrame,
-    test_date: Union[str, None] = None,
-    test_size: float = 0.2,
-    date_col: str = "date",
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    時系列データを訓練データとテストデータに分割する
-
-    Args:
-        df: 入力データフレーム
-        test_date: テストデータの開始日付（例: '2024-10-01'）
-                    指定がない場合は、test_sizeに基づいて分割
-        test_size: テストデータの割合（test_dateが指定されていない場合に使用）
-
-    Returns:
-        Tuple[pd.DataFrame, pd.DataFrame]: 訓練データとテストデータ
-    """
-    df = format_target_first(df)
-    # 日付でソート
-    df_sorted = df.sort_values(date_col)
-
-    if test_date:
-        # 指定した日付で分割
-        df_train = df_sorted[df_sorted[date_col] < test_date]
-        df_test = df_sorted[df_sorted[date_col] >= test_date]
-    else:
-        # データ数に基づいて分割
-        train_size = int(len(df_sorted) * (1 - test_size))
-        df_train = df_sorted.iloc[:train_size]
-        df_test = df_sorted.iloc[train_size:]
-
-    df_train = df_train.drop(columns=[date_col]).reset_index(drop=True)
-    df_test = df_test.drop(columns=[date_col]).reset_index(drop=True)
-
-    return df_train, df_test
-
-
-def save_column_names(df: pd.DataFrame, output_path: str = "/opt/ml/processing/train/features.txt") -> None:
-    """特徴量重要度のプロットのためカラム名を保存する
-
-    Args:
-        df: 入力データフレーム
-        output_path: 出力パス
-    """
-    feature_names = df.columns.tolist()
-
-    with Path(output_path).open("w") as f:
-        for name in feature_names:
-            f.write(f"{name}\n")
-
-
-def save_encoders(
-    encoders_dict: Dict[str, FeatureEncoder],
-    file_dir: Path,
-    filename: str,
-) -> None:
-    """
-    エンコーダを保存する関数
-
-    Args:
-        encoders_dict(Dict[str, FeatureEncoder]): エンコーダの辞書
-        file_dir(Path): 保存先のディレクトリ
-        file_name(str): 保存ファイル名
-    """
-    with Path(file_dir / filename).open("wb") as f:
-        pickle.dump(encoders_dict, f)
-
 
 if __name__ == "__main__":
     logger.info("Starting processing data...")
@@ -399,26 +276,14 @@ if __name__ == "__main__":
     base_dir = "/opt/ml/processing"
 
     config = load_config("/opt/ml/processing/deps/config.yaml")
-    data = load_data(input_path)
+    data = load_emr_output(input_path)
     feature_engineering = FeatureEngineering(config=config)
     # データの前処理
     processed_data = feature_engineering.make_features(data)
-    # エンコーダーの適用
-    processed_data, encoders_dict = feature_engineering.apply_encoders(processed_data)
-
-    # データ分割
-    train_data, test_data = train_test_split(processed_data, test_date=feature_engineering.config.get("split_date"))
-    # カラム名を保存
-    save_column_names(train_data, output_path=f"{base_dir}/train/features.txt")
+    logger.info(f"Processed data info: {processed_data.info()}")
 
     # データの保存
-    Path(f"{base_dir}/train").mkdir(parents=True, exist_ok=True)
-    train_data.to_csv(f"{base_dir}/train/train.csv", index=False, header=False)
-    save_encoders(
-        encoders_dict,
-        file_dir=Path(f"{base_dir}/train"),
-        filename="encoders.pkl",
-    )
-    Path(f"{base_dir}/test").mkdir(parents=True, exist_ok=True)
-    test_data.to_csv(f"{base_dir}/test/test.csv", index=False, header=False)
-    logger.info("Finished processing data...")
+    Path(f"{base_dir}/extract_features").mkdir(parents=True, exist_ok=True)
+    processed_data.to_parquet(f"{base_dir}/extract_features/extract_features.parquet")
+
+    logger.info("Data processing completed successfully.")

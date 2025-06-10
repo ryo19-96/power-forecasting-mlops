@@ -1,5 +1,11 @@
 # testとtrainのデータを分ける日付（YYYY-MM-DD形式）
 split_date: 2024-10-01
+# データの分割設定（日付が優先される）
+test_ratio: 0.2
+# データ対象期間
+start_date: "2022-01-01"
+end_date: "2024-12-31"
+
 # エンコーダーの設定（One-HotエンコーディングとOrdinalエンコーディングに対応）
 encoders:
   - name: One-Hot

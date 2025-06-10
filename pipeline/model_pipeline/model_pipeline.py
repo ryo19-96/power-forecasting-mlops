@@ -19,7 +19,7 @@ from sagemaker.workflow.parameters import ParameterInteger, ParameterString
 from sagemaker.workflow.pipeline import Pipeline
 from sagemaker.workflow.properties import PropertyFile
 from sagemaker.workflow.step_collections import RegisterModel
-from sagemaker.workflow.steps import ProcessingStep, TrainingStep
+from sagemaker.workflow.steps import CacheConfig, ProcessingStep, TrainingStep
 
 # srcディレクトリのパスを取得
 BASE_DIR = Path(__file__).parent.parent.parent / "src"
@@ -67,6 +67,7 @@ def get_pipeline_custom_tags(new_tags: Any, region: str, sagemaker_project_arn: 
 
 def get_pipeline(
     region: str,
+    enable_cache: bool,
     role: Union[str, None] = None,
     default_bucket: Union[str, None] = None,
     model_package_group_name: str = "PowerForecastPackageGroup",
@@ -79,6 +80,7 @@ def get_pipeline(
 
     Args:
         region (str): AWSリージョン
+        enable_cache (bool): キャッシュを有効にするかどうか
         sagemaker_project_arn (str, optional): SageMakerプロジェクトのARN
         role (str, optional): IAMロール
         default_bucket (str, optional): デフォルトバケット名
@@ -94,27 +96,11 @@ def get_pipeline(
     Nones:
         sagemaker_project_arn: str | None = None が後で必要になる？
     """
-    # 1. SageMakerセッションの作成
+    # SageMakerセッションの作成
     sagemaker_session = get_session(region, default_bucket)
+    cache_config = CacheConfig(enable_caching=enable_cache, expire_after="P30D")
 
-    # 2. 入力データの設定
-    weather_input_data = ParameterString(
-        name="InputDataUrl",
-        default_value=pipeline_config.get(
-            "weather_data_s3",
-            f"s3://power-forecasting-mlops-{environment}/data/weather_data.csv",
-        ),
-    )
-    power_usage_input_data = ParameterString(
-        name="PowerUsageInputDataUrl",
-        default_value=pipeline_config.get(
-            "power_usage_s3",
-            f"s3://power-forecasting-mlops-{environment}/data/power_usage/",
-        ),
-    )
-
-    # 3. 処理ステップの設定
-    # load and processing step for feature engineering
+    # 処理ステップの設定
     processing_instance_count = ParameterInteger(
         name="ProcessingInstanceCount",
         default_value=pipeline_config.get("processing_instance_count", 1),
@@ -123,51 +109,19 @@ def get_pipeline(
         name="ProcessingInstanceType",
         default_value=pipeline_config.get("processing_instance_type", "ml.t3.medium"),
     )
-
-    # データをロードして結合するステップ
     image_uri = sagemaker.image_uris.retrieve(
         framework="sklearn",
-        region="ap-northeast-1",
+        region=region,
         version="0.23-1",
         py_version="py3",
         instance_type="ml.t3.medium",
     )
-    data_loader_script_processor = ScriptProcessor(
-        image_uri=image_uri,
-        command=["python3"],
-        instance_type=processing_instance_type,
-        instance_count=processing_instance_count,
-        base_job_name=f"{base_job_prefix}/data-loader",
-        sagemaker_session=sagemaker_session,
-        role=role,
-    )
 
-    step_data_loader = ProcessingStep(
-        name="LoadData",
-        processor=data_loader_script_processor,
-        inputs=[
-            ProcessingInput(
-                source=weather_input_data,
-                destination="/opt/ml/processing/input/weather",  # コンテナ内のマウント先
-                input_name="weather_data",
-            ),
-            ProcessingInput(
-                source=power_usage_input_data,
-                destination="/opt/ml/processing/input/power_usage",
-                input_name="power_usage_data",
-            ),
-        ],
-        outputs=[ProcessingOutput(output_name="merged_data", source="/opt/ml/processing/output")],
-        code=str(BASE_DIR / "data_loader.py"),
-        job_arguments=[
-            "--weather-input-data",
-            "/opt/ml/processing/input/weather/weather_data.csv",
-            "--power-usage-input-data",
-            "/opt/ml/processing/input/power_usage/",
-        ],
+    # === 特徴量エンジニアリングのステップ ===
+    emr_output_uri = ParameterString(
+        name="EMROutputUri",
+        default_value=f"s3://power-forecasting-processed-data-{environment}/",
     )
-
-    # 特徴量エンジニアリングのステップ
     sklearn_processor = SKLearnProcessor(
         framework_version="0.23-1",
         instance_type=processing_instance_type,
@@ -182,23 +136,101 @@ def get_pipeline(
         processor=sklearn_processor,
         inputs=[
             ProcessingInput(
-                source=step_data_loader.properties.ProcessingOutputConfig.Outputs["merged_data"].S3Output.S3Uri,
-                destination="/opt/ml/processing/input_data",
+                source=emr_output_uri,
+                destination="/opt/ml/processing/input_data/",  # コンテナ内のマウント先
                 input_name="merged_data",
             ),
             ProcessingInput(source=str(BASE_DIR), destination="/opt/ml/processing/deps"),
         ],
         outputs=[
-            ProcessingOutput(output_name="train", source="/opt/ml/processing/train"),
-            ProcessingOutput(output_name="test", source="/opt/ml/processing/test"),
+            ProcessingOutput(output_name="extract_features", source="/opt/ml/processing/extract_features"),
         ],
         code=str(BASE_DIR / "preprocess.py"),
         job_arguments=[
             "--input-data",
-            "/opt/ml/processing/input_data/merged_data.pkl",
+            "/opt/ml/processing/input_data/",
         ],
+        cache_config=cache_config,
+    )
+    # === Feature Storeへの登録ステップ ===
+    feature_group_name_param = ParameterString("FeatureGroupName", default_value="power_forecast_features")
+
+    feature_ingest_proc = ScriptProcessor(
+        image_uri=image_uri,
+        command=["python3"],
+        instance_type=processing_instance_type,
+        instance_count=processing_instance_count,
+        base_job_name=f"{base_job_prefix}/ingest-feature",
+        sagemaker_session=sagemaker_session,
+        role=role,
     )
 
+    step_ingest = ProcessingStep(
+        name="IngestToFeatureStore",
+        processor=feature_ingest_proc,
+        inputs=[
+            ProcessingInput(
+                source=step_process.properties.ProcessingOutputConfig.Outputs["extract_features"].S3Output.S3Uri,
+                destination="/opt/ml/processing/extract_features",
+            ),
+        ],
+        outputs=[
+            ProcessingOutput(
+                output_name="offline_uri",
+                source="/opt/ml/processing/offline_uri",
+            ),
+        ],
+        code=str(BASE_DIR / "ingest_feature_store.py"),
+        job_arguments=[
+            "--feature-group-name",
+            feature_group_name_param,
+            "--region",
+            region,
+        ],
+        cache_config=cache_config,
+    )
+
+    # === train, testデータの準備ステップ ===
+    glue_db = ParameterString("glue_db", default_value="power_features_db")
+    glue_table = ParameterString("glue_table", default_value="power_forecast_features")
+
+    dataprep_proc = ScriptProcessor(
+        image_uri=image_uri,
+        command=["python3"],
+        instance_type=processing_instance_type,
+        instance_count=processing_instance_count,
+        base_job_name=f"{base_job_prefix}/dataprep",
+        role=role,
+        sagemaker_session=sagemaker_session,
+    )
+    step_dataprep = ProcessingStep(
+        name="DataPrepFromFeatureStore",
+        processor=dataprep_proc,
+        # offline storeメタ(基本的に不要だがpipeline DAGで表示されるように意図的にinputを書く)
+        inputs=[
+            ProcessingInput(
+                source=step_ingest.properties.ProcessingOutputConfig.Outputs["offline_uri"].S3Output.S3Uri,
+                destination="/opt/ml/processing/offline_meta",
+            ),
+            ProcessingInput(source=str(BASE_DIR), destination="/opt/ml/processing/deps"),
+        ],
+        outputs=[
+            ProcessingOutput(source="/opt/ml/processing/train", output_name="train"),
+            ProcessingOutput(source="/opt/ml/processing/test", output_name="test"),
+        ],
+        code=str(BASE_DIR / "dataprep_from_future_store.py"),
+        job_arguments=[
+            "--glue-db",
+            glue_db,
+            "--glue-table",
+            glue_table,
+            "--region",
+            region,
+        ],
+        cache_config=cache_config,
+    )
+
+    # === モデルのトレーニングステップ ===
     # training step for generating model artifacts
     training_instance_type = ParameterString(
         name="TrainingInstanceType",
@@ -230,10 +262,11 @@ def get_pipeline(
         estimator=train_estimator,
         inputs={
             "train": TrainingInput(
-                s3_data=step_process.properties.ProcessingOutputConfig.Outputs["train"].S3Output.S3Uri,
+                s3_data=step_dataprep.properties.ProcessingOutputConfig.Outputs["train"].S3Output.S3Uri,
                 content_type="text/csv",
             ),
         },
+        cache_config=cache_config,
     )
 
     # デプロイ時に必要なイメージURI
@@ -255,7 +288,7 @@ def get_pipeline(
         sagemaker_session=sagemaker_session,
     )
 
-    # モデルの評価ステップを追加
+    # === モデルの評価ステップ ===
     # 評価の結果をevaluation.jsonに出力する
     evaluation_report = PropertyFile(
         name="EvaluationReport",
@@ -283,12 +316,12 @@ def get_pipeline(
                 input_name="model",
             ),
             ProcessingInput(
-                source=step_process.properties.ProcessingOutputConfig.Outputs["train"].S3Output.S3Uri,
+                source=step_dataprep.properties.ProcessingOutputConfig.Outputs["train"].S3Output.S3Uri,
                 destination="/opt/ml/processing/train",
                 input_name="train_data",
             ),
             ProcessingInput(
-                source=step_process.properties.ProcessingOutputConfig.Outputs["test"].S3Output.S3Uri,
+                source=step_dataprep.properties.ProcessingOutputConfig.Outputs["test"].S3Output.S3Uri,
                 destination="/opt/ml/processing/test",
                 input_name="test_data",
             ),
@@ -306,9 +339,10 @@ def get_pipeline(
             "--output-path",
             "/opt/ml/processing/evaluation",
         ],
+        cache_config=cache_config,
     )
 
-    # 可視化ステップを追加
+    # === 可視化ステップ ===
     visualization_script_processor = ScriptProcessor(
         image_uri=image_uri,
         command=["python3"],
@@ -329,12 +363,12 @@ def get_pipeline(
                 input_name="model",
             ),
             ProcessingInput(
-                source=step_process.properties.ProcessingOutputConfig.Outputs["train"].S3Output.S3Uri,
+                source=step_dataprep.properties.ProcessingOutputConfig.Outputs["train"].S3Output.S3Uri,
                 destination="/opt/ml/processing/train",
                 input_name="train_data",
             ),
             ProcessingInput(
-                source=step_process.properties.ProcessingOutputConfig.Outputs["test"].S3Output.S3Uri,
+                source=step_dataprep.properties.ProcessingOutputConfig.Outputs["test"].S3Output.S3Uri,
                 destination="/opt/ml/processing/test",
                 input_name="test_data",
             ),
@@ -351,9 +385,10 @@ def get_pipeline(
             "--output-path",
             "/opt/ml/processing/visualizations",
         ],
+        cache_config=cache_config,
     )
 
-    # モデル登録ステップを条件付きで追加する
+    # === モデル登録ステップを条件付きで追加 ===
     evaluation_json_uri = Join(
         on="/",
         values=[
@@ -382,7 +417,7 @@ def get_pipeline(
         model_metrics=model_metrics,
     )
 
-    # モデル品質を評価し、分岐実行を行う条件ステップ
+    # === モデル品質を評価し、分岐実行を行う条件ステップ ===
     cond_lte = ConditionLessThanOrEqualTo(
         left=JsonGet(
             step_name=step_evaluate.name,
@@ -407,10 +442,12 @@ def get_pipeline(
             processing_instance_count,
             training_instance_type,
             training_instance_count,
-            weather_input_data,
-            power_usage_input_data,
+            feature_group_name_param,
+            emr_output_uri,
+            glue_db,
+            glue_table,
         ],
-        steps=[step_data_loader, step_process, step_train, step_evaluate, step_visualization, step_cond],
+        steps=[step_process, step_ingest, step_dataprep, step_train, step_evaluate, step_visualization, step_cond],
         sagemaker_session=sagemaker_session,
     )
     return pipeline

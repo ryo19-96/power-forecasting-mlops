@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import boto3
 import yaml
 
 from model_pipeline import get_pipeline
@@ -20,6 +21,13 @@ role = run_config.get("role")
 default_bucket = run_config.get("default_bucket")
 pipeline_name = run_config.get("pipeline_name", "PowerForecastPipeline")
 environment = run_config.get("environment", "dev")
+enable_cache = run_config.get("enable_cache", False)
+
+sagemaker_client = boto3.client("sagemaker")
+desc = sagemaker_client.describe_feature_group(FeatureGroupName="power_forecast_features")
+
+glue_db = desc["OfflineStoreConfig"]["DataCatalogConfig"]["Database"]
+glue_table = desc["OfflineStoreConfig"]["DataCatalogConfig"]["TableName"]
 
 pipeline = get_pipeline(
     region=region,
@@ -28,6 +36,7 @@ pipeline = get_pipeline(
     pipeline_name=pipeline_name,
     environment=environment,
     pipeline_config=pipeline_config,
+    enable_cache=enable_cache,
 )
 
 # 定義をSageMakerに登録
@@ -36,6 +45,10 @@ pipeline.upsert(role_arn=role)
 # 実行
 execution = pipeline.start(
     execution_display_name=f"model-pipeline-{run_time}",
+    parameters={
+        "glue_db": glue_db,
+        "glue_table": glue_table,
+    },
 )
 print("Started pipeline execution:")
 print(f"Execution ARN: {execution.arn}")

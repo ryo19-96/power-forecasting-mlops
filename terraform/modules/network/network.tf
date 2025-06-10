@@ -101,7 +101,7 @@ resource "aws_subnet" "private_subnet" {
 }
 
 resource "aws_route_table" "private_route_table" {
-  count  = length(var.azs)
+  count  = var.enable_nat_gateway ? length(var.azs) : 0
   vpc_id = aws_vpc.vpc.id
   route {
     cidr_block     = "0.0.0.0/0"
@@ -113,7 +113,7 @@ resource "aws_route_table" "private_route_table" {
 }
 
 resource "aws_route_table_association" "private_route_table_associations" {
-  count          = length(var.azs)
+  count          = var.enable_nat_gateway ? length(var.azs) : 0
   subnet_id      = aws_subnet.private_subnet[count.index].id
   route_table_id = aws_route_table.private_route_table[count.index].id
 }

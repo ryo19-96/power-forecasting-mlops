@@ -1,3 +1,7 @@
+variable "account_id" {
+  type = string
+}
+
 # sagemaker の使用ロール
 resource "aws_iam_role" "power_forecasting_role" {
   assume_role_policy = jsonencode(
@@ -44,7 +48,9 @@ resource "aws_iam_policy" "power_forecasting_policy" {
         ],
         Resource = [
           "arn:aws:s3:::power-forecasting-mlops-${terraform.workspace}",
-          "arn:aws:s3:::power-forecasting-mlops-${terraform.workspace}/*"
+          "arn:aws:s3:::power-forecasting-mlops-${terraform.workspace}/*",
+          "arn:aws:s3:::power-forecasting-processed-data-${terraform.workspace}",
+          "arn:aws:s3:::power-forecasting-processed-data-${terraform.workspace}/*",
         ]
       },
       {
@@ -85,6 +91,42 @@ resource "aws_iam_policy" "power_forecasting_policy" {
           "arn:aws:s3:::jumpstart-cache-prod-ap-northeast-1",
           "arn:aws:s3:::jumpstart-cache-prod-ap-northeast-1/*"
         ]
+      },
+      {
+        Effect = "Allow",
+        Action = [
+          "glue:CreateTable",
+          "glue:GetTable",
+          "glue:GetTables",
+          "glue:GetDatabase",
+          "glue:DeleteTable",
+        ],
+        Resource = "*"
+      },
+      {
+        Effect = "Allow",
+        Action = ["s3:PutObject", "s3:GetObject", "s3:ListBucket", "s3:GetBucketAcl", "s3:GetBucketLocation"],
+        Resource = [
+          "arn:aws:s3:::power-forecast-featurestore-offline-${terraform.workspace}",
+          "arn:aws:s3:::power-forecast-featurestore-offline-${terraform.workspace}/*",
+          "arn:aws:s3:::power-forecast-athena-query-results-${terraform.workspace}",
+          "arn:aws:s3:::power-forecast-athena-query-results-${terraform.workspace}/*",
+        ]
+      },
+      {
+        Effect   = "Allow",
+        Action   = ["sagemaker:PutRecord", "sagemaker:BatchGetRecord"],
+        Resource = "*"
+      },
+      {
+        "Effect" : "Allow",
+        "Action" : [
+          "athena:GetWorkGroup",
+          "athena:StartQueryExecution",
+          "athena:GetQueryExecution",
+          "athena:GetQueryResults"
+        ],
+        "Resource" : "*"
       }
     ]
   })
