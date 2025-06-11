@@ -98,7 +98,7 @@ output "succeeded_deploy_lambda" {
   }
 }
 
-# === power_usageのzipファイルが更新されたとき、S3のzipファイルを解凍するラムダ関数===
+# === power_usageのzipファイルが更新されたとき、S3のzipファイルを解凍するラムダ関数 ===
 variable "extract_bucket_name" {
   type = string
 }
@@ -136,7 +136,7 @@ resource "aws_lambda_permission" "allow_s3_trigger_power_usage" {
   source_arn    = var.raw_bucket.arn
 }
 
-# === weather_fileが更新されたとき、中身を日付毎に抽出するラムダ関数===
+# === weather_fileが更新されたとき、中身を日付毎に抽出するラムダ関数 ===
 resource "aws_lambda_function" "extract_weather_file" {
   function_name    = "extract-weather-file-${terraform.workspace}"
   filename         = "../lambda/extract_weather_data.zip"
@@ -183,4 +183,41 @@ resource "aws_s3_bucket_notification" "s3_trigger_lambda" {
     aws_lambda_permission.allow_s3_trigger_power_usage,
     aws_lambda_permission.allow_s3_trigger_weather_data,
   ]
+}
+
+# === model pipeline を実行するラムダ関数 ===
+variable "pipeline_name" {
+  type = string
+}
+
+variable "feature_group_name" {
+  type = string
+}
+
+variable "lambda_pipeline_exec_role_arn" {
+  type = string
+}
+
+resource "aws_lambda_function" "start_pipeline" {
+  function_name    = "start-${var.pipeline_name}"
+  filename         = "../lambda/daily_pipeline.zip"
+  source_code_hash = filebase64sha256("../lambda/daily_pipeline.zip")
+  handler          = "daily_pipeline.lambda_handler"
+  role             = var.lambda_pipeline_exec_role_arn
+  runtime          = "python3.10"
+  timeout          = 600
+
+  environment {
+    variables = {
+      PIPELINE_NAME      = var.pipeline_name
+      FEATURE_GROUP_NAME = var.feature_group_name
+    }
+  }
+}
+
+output "start_pipeline_function" {
+  value = {
+    arn           = aws_lambda_function.start_pipeline.arn
+    function_name = aws_lambda_function.start_pipeline.function_name
+  }
 }
