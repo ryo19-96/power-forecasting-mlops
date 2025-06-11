@@ -18,8 +18,12 @@ module "s3" {
 }
 
 module "iam" {
-  source     = "./modules/iam"
-  account_id = data.aws_caller_identity.current.account_id
+  source                          = "./modules/iam"
+  account_id                      = data.aws_caller_identity.current.account_id
+  account_id_lambda_pipeline_exec = data.aws_caller_identity.current.account_id
+  region                          = var.aws_region
+  pipeline_name                   = var.model_pipeline_name
+  feature_group_name              = var.feature_group_name
 }
 
 module "lambda" {
@@ -34,6 +38,10 @@ module "lambda" {
   extract_bucket_name          = module.s3.extract_bucket_name
   raw_bucket                   = module.s3.raw_bucket
   lambda_extract_data_role_arn = module.iam.extract_data_role.arn
+  # model pipeline実行用
+  lambda_pipeline_exec_role_arn = module.iam.lambda_pipeline_exec_role.arn
+  pipeline_name                 = var.model_pipeline_name
+  feature_group_name            = var.feature_group_name
 }
 
 
@@ -43,9 +51,11 @@ module "api_gateway" {
 }
 
 module "eventbridge" {
-  source                           = "./modules/eventbridge"
-  aws_lambda_function              = module.lambda.send_approval_email_lambda
-  lambda_succeeded_deploy_function = module.lambda.succeeded_deploy_lambda
+  source                              = "./modules/eventbridge"
+  aws_lambda_function                 = module.lambda.send_approval_email_lambda
+  lambda_succeeded_deploy_function    = module.lambda.succeeded_deploy_lambda
+  lambda_model_pipeline_function      = module.lambda.start_pipeline_function
+  lambda_model_pipeline_exec_role_arn = module.iam.lambda_pipeline_exec_role.arn
 }
 
 module "dynamodb" {

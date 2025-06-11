@@ -24,3 +24,14 @@ variable "vpc_cidr" {
   type    = string
   default = "10.0.0.0/16"
 }
+
+# model_pipeline名
+variable "model_pipeline_name" {
+  type    = string
+  default = "PowerForecastPipeline"
+}
+
+variable "feature_group_name" {
+  type    = string
+  default = "power_forecast_features"
+}

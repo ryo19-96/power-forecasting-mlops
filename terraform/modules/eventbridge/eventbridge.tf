@@ -63,4 +63,38 @@ resource "aws_lambda_permission" "allow_eventbridge_invoke" {
   source_arn    = aws_cloudwatch_event_rule.deploy_succeeded.arn
 }
 
+# === model pipeline実行用のEventBridgeの設定 ===
+variable "lambda_model_pipeline_exec_role_arn" {
+  type = string
+}
 
+variable "lambda_model_pipeline_function" {
+  type = object({
+    arn           = string
+    function_name = string
+  })
+}
+
+resource "aws_scheduler_schedule" "daily_model_pipeline" {
+  name = "daily-${var.lambda_model_pipeline_function.function_name}-schedule"
+  # JST 14:00 = UTC 05:00
+  schedule_expression = "cron(0 5 * * ? *)"
+
+  flexible_time_window { mode = "OFF" }
+
+  target {
+    arn      = var.lambda_model_pipeline_function.arn
+    role_arn = var.lambda_model_pipeline_exec_role_arn
+    input    = jsonencode({}) # Lambdaのevent={}
+    retry_policy {
+      maximum_retry_attempts = 2
+    }
+  }
+}
+
+resource "aws_lambda_permission" "allow_scheduler_invoke" {
+  action        = "lambda:InvokeFunction"
+  function_name = var.lambda_model_pipeline_function.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_scheduler_schedule.daily_model_pipeline.arn
+}
