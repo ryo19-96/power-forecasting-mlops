@@ -59,7 +59,7 @@ resource "aws_iam_policy" "lambda_sagemaker" {
       {
         Effect   = "Allow",
         Action   = "sagemaker:DescribeFeatureGroup",
-        Resource = "arn:aws:sagemaker:${var.region}:${var.account_id}:feature-group/${var.feature_group_name}"
+        Resource = "arn:aws:sagemaker:${var.region}:${var.account_id_lambda_pipeline_exec}:feature-group/${var.feature_group_name}"
       }
     ]
     }

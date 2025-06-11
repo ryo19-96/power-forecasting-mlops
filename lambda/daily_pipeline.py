@@ -1,9 +1,11 @@
-import os
-import time
+# noqa: INP001
 import datetime
 import logging
+import os
+import time
+from typing import Any, Dict, Tuple
+
 import boto3
-from typing import Tuple, Dict, Any
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -33,7 +35,7 @@ def _get_glue_params(feature_group_name: str) -> Tuple[str, str]:
     return cfg["Database"], cfg["TableName"]
 
 
-def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, str]:
+def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, str]:  # noqa: ARG001
     """EventBridge Scheduler からのイベントを受けて SageMaker Pipeline を実行する Lambda 関数
 
     Args:
